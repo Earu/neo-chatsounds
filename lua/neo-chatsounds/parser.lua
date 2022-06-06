@@ -28,7 +28,7 @@ local function parse_sounds(ctx)
 			local matched = false
 			local last_space_index = -1
 			for i = 0, #ctx.current_str do
-				chatsounds.tasks.try_yield()
+				chatsounds.tasks.yield()
 
 				local index = #ctx.current_str - i
 				if index <= start_index then break end -- cant go lower than start index
@@ -204,7 +204,7 @@ local function parse_str(raw_str)
 	}
 
 	for i = 0, #raw_str do
-		chatsounds.tasks.try_yield()
+		chatsounds.tasks.yield()
 
 		local index = #raw_str - i
 		local char = raw_str[index]
@@ -231,35 +231,12 @@ local function parse_str(raw_str)
 	return coroutine.yield(global_scope)
 end
 
-local parse_id = 0
 function parser.parse_async(raw_str, on_completed)
-	local co = coroutine.create(function() parse_str(raw_str:lower()) end)
-	local task_name = ("chatsounds_parser_[%d]"):format(parse_id)
-
-	parse_id = parse_id + 1
-
-	chatsounds.tasks.run(task_name, function()
-		local status, result = coroutine.resume(co)
-		if not status then
-			chatsounds.tasks.reject(task_name, result)
-			return
-		end
-
-		if coroutine.status(co) == "dead" or istable(result) then
-			chatsounds.tasks.resolve(task_name)
-			on_completed(result or {})
-		end
-	end)
+	local task = chatsounds.tasks.create(parse_str, raw_str:lower())
+	chatsounds.tasks.run(task, on_completed)
 end
 
 function parser.parse(raw_str)
-	local co = coroutine.create(function() parse_str(raw_str:lower()) end)
-	while coroutine.status(co) ~= "dead" do
-		local status, result = coroutine.resume(co)
-		if not status then error(result) end
-
-		if result then return result end
-	end
-
-	return {}
+	local task = chatsounds.tasks.create(parse_str, raw_str:lower())
+	return chatsounds.tasks.run_sync(task)
 end

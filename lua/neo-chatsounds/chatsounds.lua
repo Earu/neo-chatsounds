@@ -10,7 +10,7 @@ end
 local modifiers = DEFINE_CHATSOUND_MODULE("modifiers")
 for _, f in pairs(file.Find("neo-chatsounds/modifiers/*.lua", "LUA")) do
 	AddCSLuaFile("neo-chatsounds/modifiers/" .. f)
-	modifiers[f:StripExtension()] = include("neo-chatsounds/modifiers/" .. name)
+	modifiers[f:StripExtension()] = include("neo-chatsounds/modifiers/" .. f)
 end
 
 AddCSLuaFile("neo-chatsounds/tasks.lua")
