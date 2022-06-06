@@ -11,8 +11,16 @@ local repos = {
 }
 
 hook.Add("InitPostEntity", "chatsounds_data", function()
+	local tasks = {}
 	for _, repo_data in ipairs(repos) do
-		http.Fetch(repo_data.url, function()
-		end)
+		local task = chatsounds.tasks.new()
+		http.Fetch(repo_data.url, function(...) task:resolve(...) end, function(...) task:reject(...) end)
+		table.insert(tasks, task)
 	end
+
+	chatsounds.tasks.all(tasks):next(function()
+
+	end, function()
+
+	end)
 end)

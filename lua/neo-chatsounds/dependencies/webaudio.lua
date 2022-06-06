@@ -859,7 +859,7 @@ do
 		return self
 	end
 
-	local FindHeadPos = requirex("find_head_pos")
+	local FindHeadPos = include("find_head_pos.lua")
 
 	function META:UpdateSourcePosition()
 		if not self.SourceEntity:IsValid() then

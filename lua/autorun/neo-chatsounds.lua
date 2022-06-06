@@ -1,2 +1,2 @@
-AddCSLuaFile("neo-chatsounds/chatsounds.lua")
-include("neo-chatsounds/chatsounds.lua")
+AddCSLuaFile("neo-chatsounds/init.lua")
+include("neo-chatsounds/init.lua")
