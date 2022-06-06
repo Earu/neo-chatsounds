@@ -3,6 +3,7 @@ _G.chatsounds = chatsounds
 
 -- external deps
 do
+	AddCSLuaFile("neo-chatsounds/dependencies/find_head_pos.lua")
 	AddCSLuaFile("neo-chatsounds/dependencies/webaudio.lua")
 	AddCSLuaFile("neo-chatsounds/dependencies/tasks.lua")
 
