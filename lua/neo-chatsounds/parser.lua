@@ -28,7 +28,7 @@ local function parse_sounds(ctx)
 			local matched = false
 			local last_space_index = -1
 			for i = 0, #ctx.current_str do
-				chatsounds.tasks.yield()
+				chatsounds.tasks.yield_runner()
 
 				local index = #ctx.current_str - i
 				if index <= start_index then break end -- cant go lower than start index
@@ -191,7 +191,8 @@ local function parse_str(raw_str)
 		parent = nil,
 		start_index = 1,
 		end_index = #raw_str,
-		type = "group"
+		type = "group",
+		root = true,
 	}
 
 	local ctx = {
@@ -204,7 +205,7 @@ local function parse_str(raw_str)
 	}
 
 	for i = 0, #raw_str do
-		chatsounds.tasks.yield()
+		chatsounds.tasks.yield_runner()
 
 		local index = #raw_str - i
 		local char = raw_str[index]
@@ -231,12 +232,6 @@ local function parse_str(raw_str)
 	return coroutine.yield(global_scope)
 end
 
-function parser.parse_async(raw_str, on_completed, on_failed)
-	local task = chatsounds.tasks.create(parse_str, raw_str:lower())
-	chatsounds.tasks.run(task, on_completed, on_failed)
-end
-
-function parser.parse(raw_str)
-	local task = chatsounds.tasks.create(parse_str, raw_str:lower())
-	return chatsounds.tasks.run_sync(task)
+function parser.parse_async(raw_str)
+	return chatsounds.tasks.execute_runner(parse_str, raw_str:lower())
 end
