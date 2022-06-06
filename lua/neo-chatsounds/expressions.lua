@@ -1,3 +1,5 @@
+local expressions = DEFINE_CHATSOUND_MODULE("expressions")
+
 local lua_str_env = {
 	PI = math.pi,
 	pi = math.pi,
@@ -45,7 +47,7 @@ local lua_str_env = {
 
 local blacklisted_syntax = { "repeat", "until", "function", "end", "\"", "\'", "%[=*%[", "%]=*%]", ":" }
 
-return function(lua_str, identifier)
+function expressions.compile(lua_str, identifier)
 	for _, syntax in pairs(blacklisted_syntax) do
 		if lua_str:find("[%p%s]" .. syntax) or lua_str:find(syntax .. "[%p%s]") then
 			return nil
