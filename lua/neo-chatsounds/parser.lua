@@ -231,9 +231,9 @@ local function parse_str(raw_str)
 	return coroutine.yield(global_scope)
 end
 
-function parser.parse_async(raw_str, on_completed)
+function parser.parse_async(raw_str, on_completed, on_failed)
 	local task = chatsounds.tasks.create(parse_str, raw_str:lower())
-	chatsounds.tasks.run(task, on_completed)
+	chatsounds.tasks.run(task, on_completed, on_failed)
 end
 
 function parser.parse(raw_str)

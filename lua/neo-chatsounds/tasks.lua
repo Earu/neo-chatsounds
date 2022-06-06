@@ -15,14 +15,18 @@ local function validate_task(task, fn_name)
 	end
 end
 
-function tasks.run(task, on_completed)
+function tasks.run(task, on_completed, on_failed)
 	validate_task(task, "tasks.run")
 
 	hook.Add("Think", task.name, function()
 		local status, result = coroutine.resume(task.coroutine)
 		if not status then
 			hook.Remove("Think", task.name)
-			error(result)
+			if on_failed then
+				on_failed(result)
+			else
+				error(result)
+			end
 		end
 
 		if result then
@@ -54,5 +58,30 @@ function tasks.yield()
 		iter = 0
 	else
 		iter = iter + 1
+	end
+end
+
+function tasks.all(tasks_arr, on_completed, on_failed)
+	local done_tasks = 0
+	local errors = {}
+	for _, task in pairs(tasks_arr) do
+		validate_task(task, "tasks.all")
+
+		tasks.run(task,
+			function()
+				done_tasks = done_tasks + 1
+
+				if done_tasks == #tasks_arr and #errors == 0 then
+					on_completed()
+				end
+			end, function(err)
+				done_tasks = done_tasks + 1
+				table.insert(errors, err)
+
+				if done_tasks == #tasks_arr and #errors > 0 then
+					on_failed(errors)
+				end
+			end
+		)
 	end
 end
