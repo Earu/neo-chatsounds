@@ -1,0 +1,1 @@
+local _ = DEFINE_CHATSOUND_MODULE("player")

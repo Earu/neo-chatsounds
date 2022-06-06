@@ -1,21 +1,20 @@
-module("tasks", package.seeall)
-_G.chatsounds.tasks = _M
+local tasks = DEFINE_CHATSOUND_MODULE("tasks")
 
-function run_task(name, fn)
+function tasks.run(name, fn)
 	hook.Add("Think", name, fn)
 end
 
-function resolve_task(name)
+function tasks.resolve(name)
 	hook.Remove("Think", name)
 end
 
-function reject_task(name, err_str)
+function tasks.reject(name, err_str)
 	hook.Remove("Think", name)
 	error(err_str)
 end
 
 local iter = 0
-function try_yield()
+function tasks.try_yield()
 	if not coroutine.running() then return end
 
 	if iter >= 10 then

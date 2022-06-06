@@ -1,13 +1,4 @@
-module("parser", package.seeall)
-_G.chatsounds.parser = _M
-
-lookup = {}
-
--- abstract away these methods are they are environement specific and we don't want to be constrained to gmod
-function build_lookup()
-	error("build_lookup() is not implemented for this environment, please implement it")
-	-- should add keys to the lookup table such as lookup[key] = true
-end
+local parser = DEFINE_CHATSOUND_MODULE("parser")
 
 local modifier_lookup = {}
 for modifier_name, modifier in pairs(chatsounds.modifiers) do
@@ -28,7 +19,7 @@ local function parse_sounds(ctx)
 	if #ctx.current_str == 0 then return end
 
 	local cur_scope = ctx.scopes[#ctx.scopes]
-	if lookup[ctx.current_str] then
+	if chatsounds.data.lookup[ctx.current_str] then
 		cur_scope.sounds = cur_scope.sounds or {}
 		table.insert(cur_scope.sounds, { text = ctx.current_str, modifiers = {}, type = "sound" })
 	else
@@ -46,7 +37,7 @@ local function parse_sounds(ctx)
 				if ctx.current_str[index] == " " then
 					last_space_index = index
 					local str_chunk = ctx.current_str:sub(start_index, index - 1)
-					if lookup[str_chunk] then
+					if chatsounds.data.lookup[str_chunk] then
 						cur_scope.sounds = cur_scope.sounds or {}
 						table.insert(cur_scope.sounds, { text = ctx.current_str, modifiers = {}, type = "sound" })
 						start_index = index + 1
@@ -151,7 +142,7 @@ local scope_handlers = {
 
 		local lua_str = raw_str:sub(index + 1, lua_string_end_index)
 		local cur_scope = ctx.scopes[#ctx.scopes]
-		local fn = compile_lua_string(lua_str, "chatsounds_parser_lua_string")
+		local fn = chatsounds.expressions.compile(lua_str, "chatsounds_parser_lua_string")
 
 		cur_scope.expression_fn = fn or function() end
 	end,
@@ -241,27 +232,27 @@ local function parse_str(raw_str)
 end
 
 local parse_id = 0
-function parse_async(raw_str, on_completed)
+function parser.parse_async(raw_str, on_completed)
 	local co = coroutine.create(function() parse_str(raw_str:lower()) end)
 	local task_name = ("chatsounds_parser_[%d]"):format(parse_id)
 
 	parse_id = parse_id + 1
 
-	chatsounds.tasks.run_task(task_name, function()
+	chatsounds.tasks.run(task_name, function()
 		local status, result = coroutine.resume(co)
 		if not status then
-			chatsounds.tasks.reject_task(task_name, result)
+			chatsounds.tasks.reject(task_name, result)
 			return
 		end
 
 		if coroutine.status(co) == "dead" or istable(result) then
-			chatsounds.tasks.resolve_task(task_name)
+			chatsounds.tasks.resolve(task_name)
 			on_completed(result or {})
 		end
 	end)
 end
 
-function parse(raw_str)
+function parser.parse(raw_str)
 	local co = coroutine.create(function() parse_str(raw_str:lower()) end)
 	while coroutine.status(co) ~= "dead" do
 		local status, result = coroutine.resume(co)

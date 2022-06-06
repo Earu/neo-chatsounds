@@ -1,10 +1,16 @@
 local chatsounds = {}
 _G.chatsounds = chatsounds
 
-chatsounds.modifiers = {}
+function DEFINE_CHATSOUND_MODULE(name)
+	local module = {}
+	chatsounds[name] = module
+	return module
+end
+
+local modifiers = DEFINE_CHATSOUND_MODULE("modifiers")
 for _, f in pairs(file.Find("neo-chatsounds/modifiers/*.lua", "LUA")) do
 	AddCSLuaFile("neo-chatsounds/modifiers/" .. f)
-	chatsounds.modifiers[f:StripExtension()] = include("neo-chatsounds/modifiers/" .. name)
+	modifiers[f:StripExtension()] = include("neo-chatsounds/modifiers/" .. name)
 end
 
 AddCSLuaFile("neo-chatsounds/tasks.lua")
