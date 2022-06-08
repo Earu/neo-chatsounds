@@ -1,6 +1,25 @@
 local chatsounds = {}
 _G.chatsounds = chatsounds
 
+function chatsounds.log(...)
+	if not metalog then
+		Msg("[neo-chatsounds] ")
+		print(...)
+		return
+	end
+
+	metalog.info("neo-chatsounds", nil, ...)
+end
+
+function chatsounds.error(err)
+	if not metalog then
+		ErrorNoHalt("[neo-chatsounds] " .. err)
+		return
+	end
+
+	metalog.error("neo-chatsounds", nil, err)
+end
+
 -- external deps
 do
 	AddCSLuaFile("neo-chatsounds/dependencies/find_head_pos.lua")

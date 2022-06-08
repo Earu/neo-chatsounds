@@ -26,10 +26,11 @@ function tasks.execute_runner(fn, ...)
 end
 
 local iter = 0
-function tasks.yield_runner()
+local DEFAULT_MAX_ITERS = 25
+function tasks.yield_runner(max_iters)
 	if not coroutine.running() then return end
 
-	if iter >= 10 then
+	if iter >= (max_iters or DEFAULT_MAX_ITERS) then
 		coroutine.yield()
 		iter = 0
 	else
