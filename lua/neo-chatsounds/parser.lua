@@ -24,22 +24,24 @@ local function parse_sounds(ctx)
 		table.insert(cur_scope.sounds, { text = ctx.current_str, modifiers = {}, type = "sound" })
 	else
 		local start_index = 1
-		while start_index < #ctx.current_str do
+		while start_index <= #ctx.current_str do
 			local matched = false
 			local last_space_index = -1
 			for i = 0, #ctx.current_str do
 				chatsounds.tasks.yield_runner()
 
 				local index = #ctx.current_str - i
-				if index <= start_index then break end -- cant go lower than start index
+				if index < start_index then break end -- cant go lower than start index
 
-				-- we only want to match with words so account for space chars
-				if ctx.current_str[index] == " " then
+				-- we only want to match with words so account for space chars and end of string
+				if ctx.current_str[index] == " " or index == start_index then
+					index = index == start_index and #ctx.current_str + 1 or index -- small hack for end of string
 					last_space_index = index
-					local str_chunk = ctx.current_str:sub(start_index, index - 1)
+
+					local str_chunk = ctx.current_str:sub(start_index, index - 1):Trim() -- need to trim here, because the player can chain multiple spaces
 					if chatsounds.data.lookup[str_chunk] then
 						cur_scope.sounds = cur_scope.sounds or {}
-						table.insert(cur_scope.sounds, { text = ctx.current_str, modifiers = {}, type = "sound" })
+						table.insert(cur_scope.sounds, { text = str_chunk, modifiers = {}, type = "sound" })
 						start_index = index + 1
 						matched = true
 						break
