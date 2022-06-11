@@ -48,9 +48,11 @@ end
 do
 	AddCSLuaFile("neo-chatsounds/internal_modules/runners.lua")
 	AddCSLuaFile("neo-chatsounds/internal_modules/expressions.lua")
+	AddCSLuaFile("neo-chatsounds/internal_modules/http.lua")
 
 	include("neo-chatsounds/internal_modules/runners.lua")
 	include("neo-chatsounds/internal_modules/expressions.lua")
+	include("neo-chatsounds/internal_modules/http.lua")
 end
 
 -- core

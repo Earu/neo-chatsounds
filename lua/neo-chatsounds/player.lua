@@ -2,40 +2,59 @@ if not CLIENT then return end
 
 local cs_player = chatsounds.Module("Player")
 
-local function play_group_async(ply, sound_group)
-	if sound_group.type ~= "group" then return end
+local function get_wanted_sound(sound_data)
+	local matching_sounds = chatsounds.Data.Lookup[sound_data.Key]
 
-	for _, sn in pairs(sound_group.sounds) do
-		local existing_sounds = chatsounds.data.lookup[sn.text]
-		local sound_data = existing_sounds[math.random(#existing_sounds)]
-		local sound_task = chatsounds.Tasks.new()
-		sound.PlayURL(sound_data.url, "3d", function(channel)
-			if not IsValid(channel) then
-				sound_task:resolve()
-				return
-			end
+	local index = math.random(#matching_sounds)
+	for _, modifier in ipairs(sound_data.Modifiers) do
+		if modifier.OnSelection then
+			index, matching_sounds = modifier:OnSelection(index, matching_sounds)
+		end
+	end
 
-			timer.Simple(sound_data.length, function() sound_task:resolve() end)
+	return matching_sounds[math.max(1, index) % #matching_sounds]
+end
 
-			channel:SetPos(ply:GetPos())
-			channel:Play()
+local function play_sound_group_async(ply, sound_group)
+	if sound_group.Type ~= "group" then return end
+
+	for _, sound_data in pairs(sound_group.Sounds) do
+		local _sound = get_wanted_sound(sound_data)
+		local hash = util.SHA1(_sound.Url)
+		local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(_sound.Realm, hash)
+		local sound_dir_path = sound_path:GetPathFromFilename()
+		if not file.Exists(sound_dir_path, "DATA") then
+			file.CreateDir(sound_dir_path)
+		end
+
+		local download_task = chatsounds.Tasks.new()
+		if not _sound.Cached then
+			chatsounds.Log("Downloading %s", _sound.Url)
+			chatsounds.Http.Get(_sound.Url):next(function(res)
+				if res.Status ~= 200 then return end
+
+				file.Write(sound_path, res.Body)
+				_sound.Cached = true
+
+				chatsounds.Log("Downloaded %s", _sound.Url)
+				download_task:resolve()
+			end, chatsounds.Error)
+		else
+			download_task:resolve()
+		end
+
+		download_task:next(function()
+			local stream = chatsounds.WebAudio.CreateStream("data/" .. sound_path)
+			stream:Play()
+			-- modifier bs ?
 		end)
 	end
-
-
-	local task_queue = sound_task
-	for _, child_grp in ipairs(sound_group.children) do
-		task_queue = task_queue:next(function() return play_group_async(ply, child_grp) end, chatsounds.Error)
-	end
-
-	return task_queue
 end
 
 function cs_player.PlayAsync(ply, str)
 	local t = chatsounds.Tasks.new()
 	chatsounds.Parser.ParseAsync(str):next(function(sound_group)
-		PrintTable(sound_group)
-		play_group_async(ply, sound_group):next(function()
+		play_sound_group_async(ply, sound_group):next(function()
 			t:resolve()
 		end, chatsounds.Error)
 	end, chatsounds.Error)

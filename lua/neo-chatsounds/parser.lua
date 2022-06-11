@@ -2,46 +2,46 @@ local parser = chatsounds.Module("Parser")
 
 local modifier_lookup = {}
 for modifier_name, modifier in pairs(chatsounds.Modifiers) do
-	if not modifier.only_legacy then
+	if not modifier.OnlyLegacy then
 		modifier_lookup[modifier_name] = modifier
 	end
 
-	if modifier.legacy_syntax then
-		modifier_lookup[modifier.legacy_syntax] = {
-			default_value = modifier.legacy_default_value or modifier.default_value,
-			parse_args = modifier.legacy_parse_args or modifier.parse_args,
-			name = modifier.name,
-		}
+	if modifier.LegacySyntax then
+		local legacy_modifier = table.Copy(modifier)
+		legacy_modifier.DefaultValue = modifier.LegacyDefaultValue or modifier.DefaultValue
+		legacy_modifier.ParseArgs = modifier.LegacyParseArgs or modifier.ParseArgs
+
+		modifier_lookup[modifier.LegacySyntax] = legacy_modifier
 	end
 end
 
 local function parse_sounds(ctx)
-	if #ctx.current_str == 0 then return end
+	if #ctx.CurrentStr == 0 then return end
 
-	local cur_scope = ctx.scopes[#ctx.scopes]
-	if chatsounds.Data.Lookup[ctx.current_str] then
-		cur_scope.sounds = cur_scope.sounds or {}
-		table.insert(cur_scope.sounds, { text = ctx.current_str, modifiers = {}, type = "sound" })
+	local cur_scope = ctx.Scopes[#ctx.Scopes]
+	if chatsounds.Data.Lookup[ctx.CurrentStr] then
+		cur_scope.Sounds = cur_scope.Sounds or {}
+		table.insert(cur_scope.Sounds, { Key = ctx.CurrentStr, Modifiers = {}, Type = "sound" })
 	else
 		local start_index = 1
-		while start_index <= #ctx.current_str do
+		while start_index <= #ctx.CurrentStr do
 			local matched = false
 			local last_space_index = -1
-			for i = 0, #ctx.current_str do
+			for i = 0, #ctx.CurrentStr do
 				chatsounds.Runners.Yield()
 
-				local index = #ctx.current_str - i
+				local index = #ctx.CurrentStr - i
 				if index < start_index then break end -- cant go lower than start index
 
 				-- we only want to match with words so account for space chars and end of string
-				if ctx.current_str[index] == " " or index == start_index then
-					index = index == start_index and #ctx.current_str + 1 or index -- small hack for end of string
+				if ctx.CurrentStr[index] == " " or index == start_index then
+					index = index == start_index and #ctx.CurrentStr + 1 or index -- small hack for end of string
 					last_space_index = index
 
-					local str_chunk = ctx.current_str:sub(start_index, index - 1):Trim() -- need to trim here, because the player can chain multiple spaces
+					local str_chunk = ctx.CurrentStr:sub(start_index, index - 1):Trim() -- need to trim here, because the player can chain multiple spaces
 					if chatsounds.Data.Lookup[str_chunk] then
-						cur_scope.sounds = cur_scope.sounds or {}
-						table.insert(cur_scope.sounds, { text = str_chunk, modifiers = {}, type = "sound" })
+						cur_scope.Sounds = cur_scope.Sounds or {}
+						table.insert(cur_scope.Sounds, { Key = str_chunk, Modifiers = {}, Type = "sound" })
 						start_index = index + 1
 						matched = true
 						break
@@ -61,96 +61,103 @@ local function parse_sounds(ctx)
 	end
 
 	-- assign the modifiers to the last sound parsed, if any
-	if cur_scope.sounds then
-		cur_scope.sounds[#cur_scope.sounds].modifiers = ctx.modifiers
+	if cur_scope.Sounds then
+		cur_scope.Sounds[#cur_scope.Sounds].Modifiers = ctx.Modifiers
 	end
 
 	-- reset the current string and modifiers
-	ctx.current_str = ""
-	ctx.last_current_str_space_index = -1
-	ctx.modifiers = {}
+	ctx.CurrentStr = ""
+	ctx.LastCurrentStrSpaceIndex = -1
+	ctx.Modifiers = {}
 end
 
 local scope_handlers = {
 	["("] = function(raw_str, index, ctx)
-		if ctx.in_lua_expression then return end
+		if ctx.InLuaExpression then return end
 
 		parse_sounds(ctx)
 
-		local cur_scope = table.remove(ctx.scopes, #ctx.scopes)
-		cur_scope.start_index = index
+		local cur_scope = table.remove(ctx.Scopes, #ctx.Scopes)
+		cur_scope.StartIndex = index
 	end,
 	[")"] = function(raw_str, index, ctx)
-		if ctx.in_lua_expression then return end
+		if ctx.InLuaExpression then return end
 
 		parse_sounds(ctx) -- will parse sounds and assign modifiers to said sounds if any
 
-		local parent_scope = ctx.scopes[#ctx.scopes]
+		local parent_scope = ctx.Scopes[#ctx.Scopes]
 		local new_scope = {
-			children = {},
-			parent = parent_scope,
-			start_index = -1,
-			end_index = index,
-			type = "group",
+			Children = {},
+			Parent = parent_scope,
+			StartIndex = -1,
+			EndIndex = index,
+			Type = "group",
 		}
 
-		if #ctx.modifiers > 0 then
+		if #ctx.Modifiers > 0 then
 			-- if there are modifiers, assign them to the scope
 			-- this needs to be flattened into an array later down the line if this scope becomes a modifier itself
-			new_scope.modifiers = ctx.modifiers
-			ctx.modifiers = {}
+			new_scope.Modifiers = ctx.Modifiers
+			ctx.Modifiers = {}
 		end
 
-		table.insert(parent_scope.children, 1, new_scope)
-		table.insert(ctx.scopes, new_scope)
+		table.insert(parent_scope.Children, 1, new_scope)
+		table.insert(ctx.Scopes, new_scope)
 	end,
 	[":"] = function(raw_str, index, ctx)
-		if ctx.in_lua_expression then return end
+		if ctx.InLuaExpression then return end
 
-		local modifier = { type = "modifier" }
-		local modifier_name = ctx.current_str:lower()
-		local cur_scope = ctx.scopes[#ctx.scopes]
-		if #cur_scope.children > 0 then
-			local last_scope_child = cur_scope.children[1]
+		local modifier
+		local modifier_name = ctx.CurrentStr:lower()
+		local cur_scope = ctx.Scopes[#ctx.Scopes]
+		if #cur_scope.Children > 0 then
+			local last_scope_child = cur_scope.Children[1]
 			if modifier_lookup[modifier_name] then
-				last_scope_child.type = "modifier_expression" -- mark the scope as a modifier
+				last_scope_child.Type = "modifier_expression" -- mark the scope as a modifier
 
-				if last_scope_child.modifiers then
-					for _, previous_modifier in ipairs(last_scope_child.modifiers) do
-						table.insert(ctx.modifiers, previous_modifier)
+				if last_scope_child.Modifiers then
+					for _, previous_modifier in ipairs(last_scope_child.Modifiers) do
+						table.insert(ctx.Modifiers, previous_modifier)
 					end
 				end
 
-				modifier.name = modifier_name
-				modifier.value = last_scope_child.expression_fn
-					and last_scope_child.expression_fn -- if there was a lua expression in the scope, use that
-					or modifier_lookup[modifier_name].parse_args(raw_str:sub(last_scope_child.start_index + 1, last_scope_child.end_index - 1))
-				modifier.scope = last_scope_child
+				modifier = setmetatable({
+					Type = "modifier",
+					Name = modifier_name,
+					Scope = last_scope_child,
+				}, { __index = modifier_lookup[modifier_name] })
+
+				modifier.Value = last_scope_child.ExpressionFn
+					and last_scope_child.ExpressionFn -- if there was a lua expression in the scope, use that
+					or modifier:ParseArgs(raw_str:sub(last_scope_child.StartIndex + 1, last_scope_child.EndIndex - 1))
 			end
 		else
 			if modifier_lookup[modifier_name] then
-				modifier.name = modifier_name
-				modifier.value = modifier_lookup[modifier_name].default_value
+				modifier = setmetatable({
+					Type = "modifier",
+					Name = modifier_name,
+					Value = modifier_lookup[modifier_name].DefaultValue,
+				}, { __index = modifier_lookup[modifier_name] })
 			end
 		end
 
-		table.insert(ctx.modifiers, 1, modifier)
+		table.insert(ctx.Modifiers, 1, modifier)
 
-		ctx.current_str = ""
-		ctx.last_current_str_space_index = -1
+		ctx.CurrentStr = ""
+		ctx.LastCurrentStrSpaceIndex = -1
 	end,
 	["["] = function(raw_str, index, ctx)
-		ctx.in_lua_expression = false
+		ctx.InLuaExpression = false
 
-		local lua_str = raw_str:sub(index + 1, lua_string_end_index)
-		local cur_scope = ctx.scopes[#ctx.scopes]
+		local lua_str = raw_str:sub(index + 1, ctx.LuaStringEndIndex)
+		local cur_scope = ctx.Scopes[#ctx.Scopes]
 		local fn = chatsounds.Expressions.Compile(lua_str, "chatsounds_parser_lua_string")
 
-		cur_scope.expression_fn = fn or function() end
+		cur_scope.ExpressionFn = fn or function() end
 	end,
 	["]"] = function(raw_str, index, ctx)
-		ctx.in_lua_expression = true
-		ctx.lua_string_end_index = index - 1
+		ctx.InLuaExpression = true
+		ctx.LuaStringEndIndex = index - 1
 	end,
 }
 
@@ -163,23 +170,24 @@ local function parse_legacy_modifiers(ctx, char)
 	if modifier_lookup[char] then
 		found_modifier = modifier_lookup[char]
 		modifier_start_index = 0
-	elseif modifier_lookup[char .. ctx.current_str[1]] then
-		found_modifier = modifier_lookup[char .. ctx.current_str[1]]
+	elseif modifier_lookup[char .. ctx.CurrentStr[1]] then
+		found_modifier = modifier_lookup[char .. ctx.CurrentStr[1]]
 		modifier_start_index = 1
 	end
 
 	if found_modifier then
-		local modifier = { type = "modifier", name = found_modifier.name }
+		local modifier = { Type = "modifier", Name = found_modifier.Name }
 		local args_end_index = nil
-		if ctx.last_current_str_space_index ~= -1 then
-			args_end_index = ctx.last_current_str_space_index
+		if ctx.LastCurrentStrSpaceIndex ~= -1 then
+			args_end_index = ctx.LastCurrentStrSpaceIndex
 		end
 
-		modifier.value = found_modifier.parse_args(ctx.current_str:sub(modifier_start_index + 1, args_end_index))
+		modifier = setmetatable(modifier, { __index = found_modifier })
+		modifier.Value = modifier:ParseArgs(ctx.CurrentStr:sub(modifier_start_index + 1, args_end_index))
 
-		table.insert(ctx.modifiers, 1, modifier)
-		ctx.current_str = args_end_index and ctx.current_str:sub(ctx.last_current_str_space_index + 1) or ""
-		ctx.last_current_str_space_index = -1
+		table.insert(ctx.Modifiers, 1, modifier)
+		ctx.CurrentStr = args_end_index and ctx.CurrentStr:sub(ctx.LastCurrentStrSpaceIndex + 1) or ""
+		ctx.LastCurrentStrSpaceIndex = -1
 
 		return true
 	end
@@ -189,21 +197,21 @@ end
 
 local function parse_str(raw_str)
 	local global_scope = { -- global parent scope for the string
-		children = {},
-		parent = nil,
-		start_index = 1,
-		end_index = #raw_str,
-		type = "group",
-		root = true,
+		Children = {},
+		Parent = nil,
+		StartIndex = 1,
+		EndIndex = #raw_str,
+		Type = "group",
+		Root = true,
 	}
 
 	local ctx = {
-		scopes = { global_scope },
-		in_lua_expression = false,
-		lua_string_end_index = -1,
-		modifiers = {},
-		current_str = "",
-		last_current_str_space_index = -1,
+		Scopes = { global_scope },
+		InLuaExpression = false,
+		LuaStringEndIndex = -1,
+		Modifiers = {},
+		CurrentStr = "",
+		LastCurrentStrSpaceIndex = -1,
 	}
 
 	for i = 0, #raw_str do
@@ -221,9 +229,9 @@ local function parse_str(raw_str)
 			end
 
 			if standard_iteration then
-				ctx.current_str = char .. ctx.current_str
+				ctx.CurrentStr = char .. ctx.CurrentStr
 				if char == " " then
-					ctx.last_current_str_space_index = index
+					ctx.LastCurrentStrSpaceIndex = index
 				end
 			end
 		end
