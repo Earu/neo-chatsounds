@@ -31,9 +31,11 @@ do
 	AddCSLuaFile("neo-chatsounds/dependencies/find_head_pos.lua")
 	AddCSLuaFile("neo-chatsounds/dependencies/webaudio.lua")
 	AddCSLuaFile("neo-chatsounds/dependencies/tasks.lua")
+	AddCSLuaFile("neo-chatsounds/dependencies/json.lua")
 
 	chatsounds.WebAudio = include("neo-chatsounds/dependencies/webaudio.lua")
 	chatsounds.Tasks = include("neo-chatsounds/dependencies/tasks.lua")
+	chatsounds.Json = include("neo-chatsounds/dependencies/json.lua")
 end
 
 function chatsounds.Module(name)
