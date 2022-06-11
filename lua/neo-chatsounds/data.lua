@@ -4,8 +4,12 @@ data.Lookup = {}
 
 local function http_get(url)
 	local t = chatsounds.Tasks.new()
-	http.Fetch(url, function(...)
-		t:resolve(...)
+	http.Fetch(url, function(body, _, headers, http_code)
+		t:resolve({
+			body = body,
+			headers = headers,
+			status = http_code,
+		})
 	end, function(err)
 		t:reject(err)
 	end)
@@ -34,18 +38,37 @@ function data.BuildFromGithub(repo, branch)
 
 	local api_url = ("https://api.github.com/repos/%s/git/trees/%s?recursive=1"):format(repo, branch)
 	local t = chatsounds.Tasks.new()
-	http_get(api_url):next(function(body)
+	http_get(api_url):next(function(res)
+		if res.status == 429 or res.status == 503 then
+			local delay = tonumber(res.headers["Retry-After"] or res.headers["retry-after"]) + 1
+			timer.Simple(delay, function()
+				data.BuildFromGithub(repo, branch):next(function()
+					t:resolve()
+				end, function(err)
+					t:reject(err)
+				end)
+			end)
+
+			chatsounds.Log(("Github API rate limit exceeded, retrying in %s seconds"):format(delay))
+			return
+		end
+
+		if res.status ~= 200 then
+			t:reject(res.status)
+			return
+		end
+
 		local cookie_name = ("chatsounds_[%s]_[%s]"):format(repo, branch)
-		local hash = util.CRC(body)
+		local hash = util.CRC(res.body)
 		if cookie.GetString(cookie_name) == hash then
 			chatsounds.Log(("%s/%s, no changes detected, not re-compiling lists"):format(repo, branch))
 			t:resolve(false)
 			return
 		end
 
-		local resp = util.JSONToTable(body)
+		local resp = chatsounds.Json.decode(res.body)
 		if not resp or not resp.tree then
-			t:reject("Invalid response from GitHub:\n" .. util.TableToJSON(resp, true))
+			t:reject("Invalid response from GitHub:\n" .. chatsounds.Json.encode(resp))
 			return
 		end
 
@@ -125,7 +148,7 @@ function data.Initialize()
 		end
 
 		data.Loading = nil
-		chatsounds.Log("Done compiling lists from meta")
+		chatsounds.Log("Done compiling lists")
 	end, function(errors)
 		data.Loading = nil
 
@@ -146,7 +169,7 @@ end)
 if CLIENT then
 	hook.Add("HUDPaint", "chatsounds.Data", function()
 		if not data.Loading then return end
-		if not LocalPlayer():IsTyping() then return end
+		--if not LocalPlayer():IsTyping() then return end
 
 		local chat_x, chat_y = chat.GetChatBoxPos()
 		local _, chat_h = chat.GetChatBoxSize()
