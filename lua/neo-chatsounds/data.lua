@@ -40,8 +40,13 @@ function data.BuildFromGithub(repo, branch)
 	local t = chatsounds.Tasks.new()
 	http_get(api_url):next(function(res)
 		if res.status == 429 or res.status == 503 or res.status == 403 then
-			local delay = tonumber(res.headers["Retry-After"] or res.headers["retry-after"]) + 1
-			timer.Simple(delay, function()
+			local delay = tonumber(res.headers["Retry-After"] or res.headers["retry-after"])
+			if not delay then
+				t:reject("Github API rate limit exceeded")
+				return
+			end
+
+			timer.Simple(delay + 1, function()
 				data.BuildFromGithub(repo, branch):next(function(recompiled)
 					t:resolve(recompiled)
 				end, function(err)
