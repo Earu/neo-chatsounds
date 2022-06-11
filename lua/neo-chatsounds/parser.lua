@@ -1,7 +1,7 @@
-local parser = DEFINE_CHATSOUND_MODULE("parser")
+local parser = chatsounds.Module("Parser")
 
 local modifier_lookup = {}
-for modifier_name, modifier in pairs(chatsounds.modifiers) do
+for modifier_name, modifier in pairs(chatsounds.Modifiers) do
 	if not modifier.only_legacy then
 		modifier_lookup[modifier_name] = modifier
 	end
@@ -19,7 +19,7 @@ local function parse_sounds(ctx)
 	if #ctx.current_str == 0 then return end
 
 	local cur_scope = ctx.scopes[#ctx.scopes]
-	if chatsounds.data.lookup[ctx.current_str] then
+	if chatsounds.Data.Lookup[ctx.current_str] then
 		cur_scope.sounds = cur_scope.sounds or {}
 		table.insert(cur_scope.sounds, { text = ctx.current_str, modifiers = {}, type = "sound" })
 	else
@@ -28,7 +28,7 @@ local function parse_sounds(ctx)
 			local matched = false
 			local last_space_index = -1
 			for i = 0, #ctx.current_str do
-				chatsounds.tasks.yield_runner()
+				chatsounds.Runners.Yield()
 
 				local index = #ctx.current_str - i
 				if index < start_index then break end -- cant go lower than start index
@@ -39,7 +39,7 @@ local function parse_sounds(ctx)
 					last_space_index = index
 
 					local str_chunk = ctx.current_str:sub(start_index, index - 1):Trim() -- need to trim here, because the player can chain multiple spaces
-					if chatsounds.data.lookup[str_chunk] then
+					if chatsounds.Data.Lookup[str_chunk] then
 						cur_scope.sounds = cur_scope.sounds or {}
 						table.insert(cur_scope.sounds, { text = str_chunk, modifiers = {}, type = "sound" })
 						start_index = index + 1
@@ -144,7 +144,7 @@ local scope_handlers = {
 
 		local lua_str = raw_str:sub(index + 1, lua_string_end_index)
 		local cur_scope = ctx.scopes[#ctx.scopes]
-		local fn = chatsounds.expressions.compile(lua_str, "chatsounds_parser_lua_string")
+		local fn = chatsounds.Expressions.Compile(lua_str, "chatsounds_parser_lua_string")
 
 		cur_scope.expression_fn = fn or function() end
 	end,
@@ -207,7 +207,7 @@ local function parse_str(raw_str)
 	}
 
 	for i = 0, #raw_str do
-		chatsounds.tasks.yield_runner()
+		chatsounds.Runners.Yield()
 
 		local index = #raw_str - i
 		local char = raw_str[index]
@@ -234,6 +234,6 @@ local function parse_str(raw_str)
 	return coroutine.yield(global_scope)
 end
 
-function parser.parse_async(raw_str)
-	return chatsounds.tasks.execute_runner(parse_str, raw_str:lower())
+function parser.ParseAsync(raw_str)
+	return chatsounds.Runners.Execute(parse_str, raw_str:lower())
 end

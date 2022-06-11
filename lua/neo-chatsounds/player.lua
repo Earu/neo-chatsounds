@@ -1,4 +1,4 @@
-local cs_player = DEFINE_CHATSOUND_MODULE("player")
+local cs_player = chatsounds.Module("Player")
 
 local function play_group_async(ply, sound_group)
 	if sound_group.type ~= "group" then return end
@@ -10,7 +10,7 @@ local function play_group_async(ply, sound_group)
 		local sound_metadata = existing_sounds[math.random(#existing_sounds)]
 		local sound_data = sound_metadata.sounds[math.random(#sound_metadata.sounds)]
 		local sound_url = sound_metadata.list_url .. "sound/" .. sound_data.path
-		local sound_task = chatsounds.tasks.new()
+		local sound_task = chatsounds.Tasks.new()
 		sound.PlayURL(sound_url, "3d", function(channel)
 			if not IsValid(channel) then
 				sound_task:resolve()
@@ -27,26 +27,26 @@ local function play_group_async(ply, sound_group)
 
 	local task_queue = sound_task
 	for _, child_grp in ipairs(sound_group.children) do
-		task_queue = task_queue:next(function() return play_group_async(ply, child_grp) end, chatsounds.error)
+		task_queue = task_queue:next(function() return play_group_async(ply, child_grp) end, chatsounds.Error)
 	end
 
 	return task_queue
 end
 
-function cs_player.play_async(ply, str)
-	local t = chatsounds.tasks.new()
-	chatsounds.parser.parse_async(str):next(function(sound_group)
+function cs_player.PlayAsync(ply, str)
+	local t = chatsounds.Tasks.new()
+	chatsounds.Parser.ParseAsync(str):next(function(sound_group)
 		play_group_async(ply, sound_group):next(function()
 			t:resolve()
-		end, chatsounds.error)
-	end, chatsounds.error)
+		end, chatsounds.Error)
+	end, chatsounds.Error)
 
 	return t
 end
 
-hook.Add("OnPlayerChat", "chatsounds_player", function(ply, text)
+hook.Add("OnPlayerChat", "chatsounds.Player", function(ply, text)
 	local start_time = SysTime()
-	cs_player.play_async(ply, text):next(function()
-		chatsounds.log("parsed and played sounds in " .. (SysTime() - start_time) .. "s")
+	cs_player.PlayAsync(ply, text):next(function()
+		chatsounds.Log("parsed and played sounds in " .. (SysTime() - start_time) .. "s")
 	end)
 end)

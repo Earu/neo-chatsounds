@@ -1,7 +1,7 @@
 local chatsounds = {}
 _G.chatsounds = chatsounds
 
-function chatsounds.log(...)
+function chatsounds.Log(...)
 	if not metalog then
 		Msg("[neo-chatsounds] ")
 		print(...)
@@ -11,7 +11,7 @@ function chatsounds.log(...)
 	metalog.info("neo-chatsounds", nil, ...)
 end
 
-function chatsounds.error(err)
+function chatsounds.Error(err)
 	if not metalog then
 		ErrorNoHalt("[neo-chatsounds] " .. err)
 		return
@@ -26,11 +26,11 @@ do
 	AddCSLuaFile("neo-chatsounds/dependencies/webaudio.lua")
 	AddCSLuaFile("neo-chatsounds/dependencies/tasks.lua")
 
-	chatsounds.webaudio = include("neo-chatsounds/dependencies/webaudio.lua")
-	chatsounds.tasks = include("neo-chatsounds/dependencies/tasks.lua")
+	chatsounds.WebAudio = include("neo-chatsounds/dependencies/webaudio.lua")
+	chatsounds.Tasks = include("neo-chatsounds/dependencies/tasks.lua")
 end
 
-function DEFINE_CHATSOUND_MODULE(name)
+function chatsounds.Module(name)
 	local module = chatsounds[name] or {}
 	chatsounds[name] = module
 	return module
@@ -38,16 +38,16 @@ end
 
 -- internal deps + modules
 do
-	AddCSLuaFile("neo-chatsounds/internal_modules/task_runners.lua")
+	AddCSLuaFile("neo-chatsounds/internal_modules/runners.lua")
 	AddCSLuaFile("neo-chatsounds/internal_modules/expressions.lua")
 
-	include("neo-chatsounds/internal_modules/task_runners.lua")
+	include("neo-chatsounds/internal_modules/runners.lua")
 	include("neo-chatsounds/internal_modules/expressions.lua")
 end
 
 -- core
 do
-	local modifiers = DEFINE_CHATSOUND_MODULE("modifiers")
+	local modifiers = chatsounds.Module("Modifiers")
 	for _, f in pairs(file.Find("neo-chatsounds/modifiers/*.lua", "LUA")) do
 		AddCSLuaFile("neo-chatsounds/modifiers/" .. f)
 		modifiers[f:StripExtension()] = include("neo-chatsounds/modifiers/" .. f)

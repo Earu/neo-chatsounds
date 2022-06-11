@@ -1,23 +1,22 @@
-local tasks = DEFINE_CHATSOUND_MODULE("tasks")
+local runners = chatsounds.Module("Runners")
 
-local task_id = 0
-
-function tasks.execute_runner(fn, ...)
+local runner_id = 0
+function runners.Execute(fn, ...)
 	local args = { ... }
 
 	local co = coroutine.create(function() fn(unpack(args)) end)
-	local task_name = ("neo_chatsounds_task_runner_[%d]"):format(task_id)
+	local runner_name = ("chatsounds.Runner[%d]"):format(runner_id)
 
-	local t = tasks.new()
-	hook.Add("Think", task_name, function()
+	local t = chatsounds.Tasks.new()
+	hook.Add("Think", runner_name, function()
 		local status, result = coroutine.resume(co)
 		if not status then
-			hook.Remove("Think", task_name)
+			hook.Remove("Think", runner_name)
 			t:reject(result)
 		end
 
 		if result then
-			hook.Remove("Think", task_name)
+			hook.Remove("Think", runner_name)
 			t:resolve(result)
 		end
 	end)
@@ -27,7 +26,7 @@ end
 
 local iter = 0
 local DEFAULT_MAX_ITERS = 25
-function tasks.yield_runner(max_iters)
+function runners.Yield(max_iters)
 	if not coroutine.running() then return end
 
 	if iter >= (max_iters or DEFAULT_MAX_ITERS) then
