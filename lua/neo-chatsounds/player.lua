@@ -1,17 +1,15 @@
+if not CLIENT then return end
+
 local cs_player = chatsounds.Module("Player")
 
 local function play_group_async(ply, sound_group)
 	if sound_group.type ~= "group" then return end
 
-	PrintTable(sound_group)
-
 	for _, sn in pairs(sound_group.sounds) do
 		local existing_sounds = chatsounds.data.lookup[sn.text]
-		local sound_metadata = existing_sounds[math.random(#existing_sounds)]
-		local sound_data = sound_metadata.sounds[math.random(#sound_metadata.sounds)]
-		local sound_url = sound_metadata.list_url .. "sound/" .. sound_data.path
+		local sound_data = existing_sounds[math.random(#existing_sounds)]
 		local sound_task = chatsounds.Tasks.new()
-		sound.PlayURL(sound_url, "3d", function(channel)
+		sound.PlayURL(sound_data.url, "3d", function(channel)
 			if not IsValid(channel) then
 				sound_task:resolve()
 				return

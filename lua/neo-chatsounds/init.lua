@@ -1,19 +1,25 @@
 local chatsounds = {}
 _G.chatsounds = chatsounds
 
+local NO_METALOG_HEADER_COLOR = Color(100, 100, 255)
+local COLOR_WHITE = Color(255, 255, 255)
 function chatsounds.Log(...)
 	if not metalog then
-		Msg("[neo-chatsounds] ")
-		print(...)
+		local str_args = {}
+		for _, arg in pairs({...}) do
+			table.insert(str_args, isstring(arg) and arg or tostring(arg))
+		end
+
+		MsgC(COLOR_WHITE, "[", NO_METALOG_HEADER_COLOR, "neo-chatsounds: " .. (CLIENT and "Client" or "Server"), COLOR_WHITE, "] " .. table.concat(str_args, "\t") .. "\n")
 		return
 	end
 
-	metalog.info("neo-chatsounds", nil, ...)
+	metalog.info("neo-chatsounds", CLIENT and "Client" or "Server", ...)
 end
 
 function chatsounds.Error(err)
 	if not metalog then
-		ErrorNoHalt("[neo-chatsounds] " .. err)
+		ErrorNoHalt("[neo-chatsounds: " .. (CLIENT and "Client" or "Server") .. "] " .. err)
 		return
 	end
 

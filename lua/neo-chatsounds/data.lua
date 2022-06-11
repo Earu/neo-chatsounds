@@ -13,7 +13,7 @@ local function http_get(url)
 	return t
 end
 
-local function cache_lookup()
+function data.CacheLookup()
 	if not file.Exists("chatsounds", "DATA") then
 		file.CreateDir("chatsounds")
 	end
@@ -22,119 +22,140 @@ local function cache_lookup()
 	file.Write("chatsounds/lookup.json", json)
 end
 
-local function load_lookup()
+function data.LoadCachedLookup()
 	if not file.Exists("chatsounds/lookup.json", "DATA") then return end
 
 	local json = file.Read("chatsounds/lookup.json", "DATA")
 	data.Lookup = util.JSONToTable(json)
 end
 
-local function build_from_meta_github()
-	local api_url = "https://api.github.com/repos/Metastruct/garrysmod-chatsounds/git/trees/master?recursive=1"
+function data.BuildFromGithub(repo, branch)
+	branch = branch or "master"
+
+	local api_url = ("https://api.github.com/repos/%s/git/trees/%s?recursive=1"):format(repo, branch)
 	local t = chatsounds.Tasks.new()
 	http_get(api_url):next(function(body)
+		local cookie_name = ("chatsounds_[%s]_[%s]"):format(repo, branch)
 		local hash = util.CRC(body)
-		if cookie.GetString("chatsounds_meta_hash") == hash then
-			chatsounds.Log("Meta chatsounds, no changes detected, not re-compiling lists")
-			--t:resolve(false)
-			--return
+		if cookie.GetString(cookie_name) == hash then
+			chatsounds.Log(("%s/%s, no changes detected, not re-compiling lists"):format(repo, branch))
+			t:resolve(false)
+			return
 		end
 
 		local resp = util.JSONToTable(body)
 		if not resp or not resp.tree then
-			t:reject("Invalid response from GitHub")
+			t:reject("Invalid response from GitHub:\n" .. util.TableToJSON(resp, true))
 			return
 		end
 
+		if data.Loading then
+			data.Loading.Target = data.Loading.Target + #resp.tree
+		end
+
+		local start_time = SysTime()
+		local sound_count = 0
 		chatsounds.Runners.Execute(function()
-			local http_requests = {}
 			for i, file_data in pairs(resp.tree) do
-				chatsounds.Runners.Yield(1000)
+				chatsounds.Runners.Yield(25)
 
-				if not file_data.path:match("^lua%/chatsounds%/lists%_nosend%/.*%.lua") then continue end
+				if data.Loading then
+					data.Loading.Current = data.Loading.Current + 1
 
-				local list_url = "https://raw.githubusercontent.com/Metastruct/garrysmod-chatsounds/master/" .. file_data.path
-				local http_t = chatsounds.Tasks.new()
-				table.insert(http_requests, http_t)
+					local cur_perc = math.Round((data.Loading.Current / data.Loading.Target) * 100)
+					if cur_perc % 5 == 0 and cur_perc ~= data.Loading.LastLoggedPercent and (CLIENT or (SERVER and game.IsDedicated())) then
+						data.Loading.LastLoggedPercent = cur_perc
 
-				http_get(list_url):next(function(lua)
-					local fn = CompileString(lua, "chatsounds_list: " .. file_data.path, false)
-					if isstring(fn) then
-						local err = "Failed to compile list: " .. fn
-						chatsounds.Error(err)
-						http_t:resolve()
-						return
+						local display_perc = math.Round(cur_perc / 5)
+						local display_emaining = 20 - display_perc
+						chatsounds.Log(("[%s%s] %s%%"):format(("="):rep(display_perc), (" "):rep(display_emaining), cur_perc))
 					end
+				end
 
-					local list_lookup = {}
-					local list_name = "unknown"
-					setfenv(fn, {
-						c = {
-							StartList = function(name)
-								list_name = name
-								chatsounds.Log("Compiling list: " .. name)
-							end,
-							EndList = function()
-								chatsounds.Log("Done compiling: " .. list_name)
-							end,
-						},
-						L = list_lookup
-					})
+				if file_data.path:GetExtensionFromFilename() ~= "ogg" then continue end
 
-					local success, err = pcall(fn)
-					if not success then
-						local err_msg = ("Error compiling chatsounds list \'%s\': %s"):format(list_name, err)
-						chatsounds.Error(err_msg)
-						http_t:resolve()
-						return
-					end
+				sound_count = sound_count + 1
 
-					for sound_key, sound_data in pairs(list_lookup) do
-						if #sound_data == 0 then continue end
+				local path_chunks = file_data.path:Split("/")
+				local realm_chunk_index = #path_chunks
+				local file_name = file_data.path:GetFileFromFilename()
+				if file_name:match("[0-9]+%.ogg$") then
+					file_name = path_chunks[#path_chunks]
+					realm_chunk_index = realm_chunk_index - 1
+				end
 
-						if not data.Lookup[sound_key] then
-							data.Lookup[sound_key] = {}
-						end
+				local sound_key = file_name:gsub("%.ogg$", ""):gsub("[%_%-]", " "):lower()
+				if not data.Lookup[sound_key] then
+					data.Lookup[sound_key] = {}
+				end
 
-						table.insert(data.Lookup[sound_key], {
-							list = list_name,
-							list_url = "https://raw.githubusercontent.com/Metastruct/garrysmod-chatsounds/master/",
-							sounds = sound_data
-						})
-					end
-
-					http_t:resolve()
-				end, chatsounds.Error)
+				table.insert(data.Lookup[sound_key], {
+					url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, file_data.path),
+					realm = path_chunks[realm_chunk_index]:lower()
+				})
 			end
 
-			chatsounds.Tasks.all(http_requests):next(function(res) t:resolve(true) end)
-		end)
+			cookie.Set(cookie_name, hash)
+			t:resolve(true)
+
+			chatsounds.Log(("Compiled %d sounds from %s/%s in %s second(s)"):format(sound_count, repo, branch, tostring(SysTime() - start_time)))
+		end):next(nil, chatsounds.Error)
 	end)
 
 	return t
 end
 
-local function build_source_sounds_github(repo)
-end
+function data.Initialize()
+	data.LoadCachedLookup() -- always load the cache for the lookup, it will get overriden later if necessary
 
-hook.Add("InitPostEntity", "chatsounds.Data", function()
-	load_lookup() -- always load the cache for the lookup, it will get overriden later if necessary
+	data.Loading = {
+		Current = 0,
+		Target = 0,
+	}
 
 	chatsounds.Tasks.all({
-		build_from_meta_github(),
-		build_source_sounds_github("Metastruct/garrysmod-chatsounds")
+		data.BuildFromGithub("Metastruct/garrysmod-chatsounds", "master"),
+		data.BuildFromGithub("PAC3-Server/chatsounds", "master"),
 	}):next(function(results)
 		for _, recompiled in pairs(results) do
 			if recompiled then
-				cache_lookup()
+				data.CacheLookup()
 				break
 			end
 		end
 
+		data.Loading = nil
 		chatsounds.Log("Done compiling lists from meta")
 	end, function(errors)
+		data.Loading = nil
+
 		for _, err in pairs(errors) do
 			chatsounds.Error(err)
 		end
 	end)
+end
+
+concommand.Add("chatsounds_recompile_lists", function()
+	data.Initialize()
 end)
+
+hook.Add("InitPostEntity", "chatsounds.Data", function()
+	data.Initialize()
+end)
+
+if CLIENT then
+	hook.Add("HUDPaint", "chatsounds.Data", function()
+		if not data.Loading then return end
+		if not LocalPlayer():IsTyping() then return end
+
+		local chat_x, chat_y = chat.GetChatBoxPos()
+		local _, chat_h = chat.GetChatBoxSize()
+
+		surface.SetFont("DermaLarge")
+		surface.SetTextColor(255, 255, 255, 255)
+		surface.SetTextPos(chat_x, chat_y + chat_h + 20)
+
+		local text = ("Loading chatsounds... %s%%"):format(math.Round((data.Loading.Current / data.Loading.Target) * 100))
+		surface.DrawText(text)
+	end)
+end
