@@ -34,6 +34,7 @@ end
 function cs_player.PlayAsync(ply, str)
 	local t = chatsounds.Tasks.new()
 	chatsounds.Parser.ParseAsync(str):next(function(sound_group)
+		PrintTable(sound_group)
 		play_group_async(ply, sound_group):next(function()
 			t:resolve()
 		end, chatsounds.Error)
