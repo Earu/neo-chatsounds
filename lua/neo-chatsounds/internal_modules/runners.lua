@@ -15,7 +15,7 @@ function runners.Execute(fn, ...)
 			t:reject(result)
 		end
 
-		if result then
+		if result or coroutine.status(co) == "dead" then
 			hook.Remove("Think", runner_name)
 			t:resolve(result)
 		end
