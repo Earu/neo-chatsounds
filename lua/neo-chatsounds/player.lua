@@ -12,7 +12,7 @@ local function get_wanted_sound(sound_data)
 		end
 	end
 
-	return matching_sounds[math.max(1, index % #matching_sounds)]
+	return matching_sounds[math.min(math.max(1, index), #matching_sounds)]
 end
 
 local function play_sound_group_async(ply, sound_group)
@@ -32,7 +32,7 @@ local function play_sound_group_async(ply, sound_group)
 			chatsounds.Log("Downloading %s", _sound.Url)
 			chatsounds.Http.Get(_sound.Url):next(function(res)
 				if res.Status ~= 200 then
-					chatsounds.Erorr("Failed to download %s: %d", _sound.Url, res.Status)
+					download_task:reject("Failed to download %s: %d", _sound.Url, res.Status)
 					return
 				end
 
