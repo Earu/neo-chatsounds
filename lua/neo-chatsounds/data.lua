@@ -22,7 +22,7 @@ function data.CacheLookup()
 		file.CreateDir("chatsounds")
 	end
 
-	local json = util.TableToJSON(data.Lookup)
+	local json = chatsounds.Json.encode(data.Lookup)
 	file.Write("chatsounds/lookup.json", json)
 end
 
@@ -30,7 +30,7 @@ function data.LoadCachedLookup()
 	if not file.Exists("chatsounds/lookup.json", "DATA") then return end
 
 	local json = file.Read("chatsounds/lookup.json", "DATA")
-	data.Lookup = util.JSONToTable(json)
+	data.Lookup = chatsounds.Json.decode(json)
 end
 
 function data.BuildFromGithub(repo, branch)
@@ -39,7 +39,7 @@ function data.BuildFromGithub(repo, branch)
 	local api_url = ("https://api.github.com/repos/%s/git/trees/%s?recursive=1"):format(repo, branch)
 	local t = chatsounds.Tasks.new()
 	http_get(api_url):next(function(res)
-		if res.status == 429 or res.status == 503 then
+		if res.status == 429 or res.status == 503 or res.status == 403 then
 			local delay = tonumber(res.headers["Retry-After"] or res.headers["retry-after"]) + 1
 			timer.Simple(delay, function()
 				data.BuildFromGithub(repo, branch):next(function()
@@ -50,11 +50,6 @@ function data.BuildFromGithub(repo, branch)
 			end)
 
 			chatsounds.Log(("Github API rate limit exceeded, retrying in %s seconds"):format(delay))
-			return
-		end
-
-		if res.status ~= 200 then
-			t:reject(res.status)
 			return
 		end
 
@@ -80,7 +75,7 @@ function data.BuildFromGithub(repo, branch)
 		local sound_count = 0
 		chatsounds.Runners.Execute(function()
 			for i, file_data in pairs(resp.tree) do
-				chatsounds.Runners.Yield(25)
+				chatsounds.Runners.Yield()
 
 				if data.Loading then
 					data.Loading.Current = data.Loading.Current + 1
@@ -100,14 +95,14 @@ function data.BuildFromGithub(repo, branch)
 				sound_count = sound_count + 1
 
 				local path_chunks = file_data.path:Split("/")
-				local realm_chunk_index = #path_chunks
-				local file_name = file_data.path:GetFileFromFilename()
-				if file_name:match("[0-9]+%.ogg$") then
-					file_name = path_chunks[#path_chunks]
+				local realm_chunk_index = #path_chunks - 1
+				local file_name = file_data.path:GetFileFromFilename():gsub("%.ogg$", "")
+				if tonumber(file_name) then
+					file_name = path_chunks[#path_chunks - 1]
 					realm_chunk_index = realm_chunk_index - 1
 				end
 
-				local sound_key = file_name:gsub("%.ogg$", ""):gsub("[%_%-]", " "):lower()
+				local sound_key = file_name:gsub("[%_%-]", " "):lower()
 				if not data.Lookup[sound_key] then
 					data.Lookup[sound_key] = {}
 				end
@@ -122,8 +117,8 @@ function data.BuildFromGithub(repo, branch)
 			t:resolve(true)
 
 			chatsounds.Log(("Compiled %d sounds from %s/%s in %s second(s)"):format(sound_count, repo, branch, tostring(SysTime() - start_time)))
-		end):next(nil, chatsounds.Error)
-	end)
+		end):next(nil, function(err) t:reject(err) end)
+	end, function(err) t:reject(err) end)
 
 	return t
 end
@@ -169,7 +164,8 @@ end)
 if CLIENT then
 	hook.Add("HUDPaint", "chatsounds.Data", function()
 		if not data.Loading then return end
-		--if not LocalPlayer():IsTyping() then return end
+		if data.Loading.Target == 0 then return end
+		if not LocalPlayer():IsTyping() then return end
 
 		local chat_x, chat_y = chat.GetChatBoxPos()
 		local _, chat_h = chat.GetChatBoxSize()
