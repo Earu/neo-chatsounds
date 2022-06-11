@@ -42,8 +42,8 @@ function data.BuildFromGithub(repo, branch)
 		if res.status == 429 or res.status == 503 or res.status == 403 then
 			local delay = tonumber(res.headers["Retry-After"] or res.headers["retry-after"]) + 1
 			timer.Simple(delay, function()
-				data.BuildFromGithub(repo, branch):next(function()
-					t:resolve()
+				data.BuildFromGithub(repo, branch):next(function(recompiled)
+					t:resolve(recompiled)
 				end, function(err)
 					t:reject(err)
 				end)
