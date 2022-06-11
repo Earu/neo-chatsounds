@@ -2,21 +2,6 @@ local data = chatsounds.Module("Data")
 
 data.Lookup = {}
 
-local function http_get(url)
-	local t = chatsounds.Tasks.new()
-	http.Fetch(url, function(body, _, headers, http_code)
-		t:resolve({
-			body = body,
-			headers = headers,
-			status = http_code,
-		})
-	end, function(err)
-		t:reject(err)
-	end)
-
-	return t
-end
-
 function data.CacheLookup()
 	if not file.Exists("chatsounds", "DATA") then
 		file.CreateDir("chatsounds")
@@ -33,14 +18,14 @@ function data.LoadCachedLookup()
 	data.Lookup = chatsounds.Json.decode(json)
 end
 
-function data.BuildFromGithub(repo, branch)
+function data.BuildFromGithub(repo, branch, force_recompile)
 	branch = branch or "master"
 
 	local api_url = ("https://api.github.com/repos/%s/git/trees/%s?recursive=1"):format(repo, branch)
 	local t = chatsounds.Tasks.new()
-	http_get(api_url):next(function(res)
-		if res.status == 429 or res.status == 503 or res.status == 403 then
-			local delay = tonumber(res.headers["Retry-After"] or res.headers["retry-after"])
+	chatsounds.Http.Get(api_url):next(function(res)
+		if res.Status == 429 or res.Status == 503 or res.Status == 403 then
+			local delay = tonumber(res.Headers["Retry-After"] or res.Headers["retry-after"])
 			if not delay then
 				t:reject("Github API rate limit exceeded")
 				return
@@ -59,14 +44,14 @@ function data.BuildFromGithub(repo, branch)
 		end
 
 		local cookie_name = ("chatsounds_[%s]_[%s]"):format(repo, branch)
-		local hash = util.CRC(res.body)
-		if cookie.GetString(cookie_name) == hash then
+		local hash = util.SHA1(res.Body)
+		if not force_recompile and cookie.GetString(cookie_name) == hash and file.Exists("chatsounds/lookup.json", "DATA") then
 			chatsounds.Log(("%s/%s, no changes detected, not re-compiling lists"):format(repo, branch))
 			t:resolve(false)
 			return
 		end
 
-		local resp = chatsounds.Json.decode(res.body)
+		local resp = chatsounds.Json.decode(res.Body)
 		if not resp or not resp.tree then
 			t:reject("Invalid response from GitHub:\n" .. chatsounds.Json.encode(resp))
 			return
@@ -112,9 +97,13 @@ function data.BuildFromGithub(repo, branch)
 					data.Lookup[sound_key] = {}
 				end
 
+				local realm = path_chunks[realm_chunk_index]:lower()
+				local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, file_data.path)
+				local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
 				table.insert(data.Lookup[sound_key], {
-					url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, file_data.path),
-					realm = path_chunks[realm_chunk_index]:lower()
+					Url = url,
+					Realm = realm,
+					Cached = file.Exists(sound_path, "DATA")
 				})
 			end
 
@@ -128,7 +117,7 @@ function data.BuildFromGithub(repo, branch)
 	return t
 end
 
-function data.Initialize()
+function data.CompileLists(force_recompile)
 	data.LoadCachedLookup() -- always load the cache for the lookup, it will get overriden later if necessary
 
 	data.Loading = {
@@ -137,8 +126,8 @@ function data.Initialize()
 	}
 
 	chatsounds.Tasks.all({
-		data.BuildFromGithub("Metastruct/garrysmod-chatsounds", "master"),
-		data.BuildFromGithub("PAC3-Server/chatsounds", "master"),
+		data.BuildFromGithub("Metastruct/garrysmod-chatsounds", "master", force_recompile),
+		data.BuildFromGithub("PAC3-Server/chatsounds", "master", force_recompile),
 	}):next(function(results)
 		for _, recompiled in pairs(results) do
 			if recompiled then
@@ -159,11 +148,11 @@ function data.Initialize()
 end
 
 concommand.Add("chatsounds_recompile_lists", function()
-	data.Initialize()
+	data.CompileLists(true)
 end)
 
 hook.Add("InitPostEntity", "chatsounds.Data", function()
-	data.Initialize()
+	data.CompileLists()
 end)
 
 if CLIENT then
