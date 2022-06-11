@@ -18,6 +18,23 @@ function data.LoadCachedLookup()
 	data.Lookup = chatsounds.Json.decode(json)
 end
 
+local function url_encode(str)
+	-- ensure all newlines are in CRLF form
+	str = str:gsub("\r?\n", "\r\n")
+
+	-- percent-encode all non-unreserved characters
+	-- as per RFC 3986, Section 2.3
+	-- (except for space, which gets plus-encoded)
+	str = str:gsub("([^%w%-%.%_%~ ])", function(c)
+		return ("%%%02X"):format(c:byte())
+	end)
+
+	-- convert spaces to their encoded form
+	str = str:gsub("%s", "%%20")
+
+	return str
+end
+
 function data.BuildFromGithub(repo, branch, force_recompile)
 	branch = branch or "master"
 
@@ -98,7 +115,7 @@ function data.BuildFromGithub(repo, branch, force_recompile)
 				end
 
 				local realm = path_chunks[realm_chunk_index]:lower()
-				local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, file_data.path)
+				local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, table.concat(path_chunks, "/", 1, #path_chunks - 1) .. "/" .. url_encode(path_chunks[#path_chunks]))
 				local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
 				table.insert(data.Lookup[sound_key], {
 					Url = url,

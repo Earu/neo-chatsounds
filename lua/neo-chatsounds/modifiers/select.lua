@@ -9,7 +9,7 @@ function MODIFIER:ParseArgs(self, args)
 	local select_id = tonumber(args)
 	if not select_id then return 0 end
 
-	return math.max(0, select_id)
+	return math.max(1, select_id)
 end
 
 return MODIFIER
