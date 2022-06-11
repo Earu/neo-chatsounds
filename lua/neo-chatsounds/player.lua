@@ -12,7 +12,7 @@ local function get_wanted_sound(sound_data)
 		end
 	end
 
-	return matching_sounds[math.max(1, index) % #matching_sounds]
+	return matching_sounds[math.max(1, index % #matching_sounds)]
 end
 
 local function play_sound_group_async(ply, sound_group)
@@ -31,7 +31,10 @@ local function play_sound_group_async(ply, sound_group)
 		if not _sound.Cached then
 			chatsounds.Log("Downloading %s", _sound.Url)
 			chatsounds.Http.Get(_sound.Url):next(function(res)
-				if res.Status ~= 200 then return end
+				if res.Status ~= 200 then
+					chatsounds.Erorr("Failed to download %s: %d", _sound.Url, res.Status)
+					return
+				end
 
 				file.Write(sound_path, res.Body)
 				_sound.Cached = true
