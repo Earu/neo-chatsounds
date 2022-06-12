@@ -176,7 +176,7 @@ local function merge_repos()
 
 				for _, sound_data in pairs(sound_list) do
 					chatsounds.Runners.Yield(250)
-					table.insert(lookup[sound_key], sound_data)
+					table.insert(lookup.List[sound_key], sound_data)
 					update_loading_state()
 				end
 

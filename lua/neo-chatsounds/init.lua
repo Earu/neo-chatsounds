@@ -19,7 +19,7 @@ end
 
 function chatsounds.Error(err)
 	if not metalog then
-		ErrorNoHalt("[neo-chatsounds: " .. (CLIENT and "Client" or "Server") .. "] " .. err)
+		ErrorNoHalt("[neo-chatsounds: " .. (CLIENT and "Client" or "Server") .. "] " .. err .. "\n")
 		return
 	end
 
