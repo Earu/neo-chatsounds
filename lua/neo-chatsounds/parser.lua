@@ -19,7 +19,7 @@ local function parse_sounds(ctx)
 	if #ctx.CurrentStr == 0 then return end
 
 	local cur_scope = ctx.Scopes[#ctx.Scopes]
-	if chatsounds.Data.Lookup[ctx.CurrentStr] then
+	if chatsounds.Data.Lookup.List[ctx.CurrentStr] then
 		cur_scope.Sounds = cur_scope.Sounds or {}
 		table.insert(cur_scope.Sounds, { Key = ctx.CurrentStr, Modifiers = {}, Type = "sound" })
 	else
@@ -39,7 +39,7 @@ local function parse_sounds(ctx)
 					last_space_index = index
 
 					local str_chunk = ctx.CurrentStr:sub(start_index, index - 1):Trim() -- need to trim here, because the player can chain multiple spaces
-					if chatsounds.Data.Lookup[str_chunk] then
+					if chatsounds.Data.Lookup.List[str_chunk] then
 						cur_scope.Sounds = cur_scope.Sounds or {}
 						table.insert(cur_scope.Sounds, { Key = str_chunk, Modifiers = {}, Type = "sound" })
 						start_index = index + 1
