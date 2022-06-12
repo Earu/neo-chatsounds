@@ -108,7 +108,7 @@ local scope_handlers = {
 		if ctx.InLuaExpression then return end
 
 		local modifier
-		local modifier_name = ctx.CurrentStr:lower()
+		local modifier_name = ctx.CurrentStr
 		local cur_scope = ctx.Scopes[#ctx.Scopes]
 		if #cur_scope.Children > 0 then
 			local last_scope_child = cur_scope.Children[1]
