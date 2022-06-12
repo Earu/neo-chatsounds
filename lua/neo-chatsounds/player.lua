@@ -20,15 +20,13 @@ local function play_sound_group_async(ply, sound_group)
 
 	for _, sound_data in pairs(sound_group.Sounds) do
 		local _sound = get_wanted_sound(sound_data)
-		local hash = util.SHA1(_sound.Url)
-		local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(_sound.Realm, hash)
-		local sound_dir_path = sound_path:GetPathFromFilename()
+		local sound_dir_path = _sound.Path:GetPathFromFilename()
 		if not file.Exists(sound_dir_path, "DATA") then
 			file.CreateDir(sound_dir_path)
 		end
 
 		local download_task = chatsounds.Tasks.new()
-		if not _sound.Cached then
+		if not file.Exists(_sound.Path, "DATA") then
 			chatsounds.Log("Downloading %s", _sound.Url)
 			chatsounds.Http.Get(_sound.Url):next(function(res)
 				if res.Status ~= 200 then
@@ -36,9 +34,7 @@ local function play_sound_group_async(ply, sound_group)
 					return
 				end
 
-				file.Write(sound_path, res.Body)
-				_sound.Cached = true
-
+				file.Write(_sound.Path, res.Body)
 				chatsounds.Log("Downloaded %s", _sound.Url)
 				download_task:resolve()
 			end, chatsounds.Error)
@@ -47,7 +43,7 @@ local function play_sound_group_async(ply, sound_group)
 		end
 
 		download_task:next(function()
-			local stream = chatsounds.WebAudio.CreateStream("data/" .. sound_path)
+			local stream = chatsounds.WebAudio.CreateStream("data/" .. _sound.Path)
 			stream:Play()
 			-- modifier bs ?
 		end)

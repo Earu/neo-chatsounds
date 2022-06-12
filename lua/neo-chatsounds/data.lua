@@ -146,7 +146,7 @@ function data.BuildFromGithub(repo, branch, force_recompile)
 				local sound_data = {
 					Url = url,
 					Realm = realm,
-					Cached = file.Exists(sound_path, "DATA")
+					Path = sound_path,
 				}
 
 				table.insert(data.Repositories[repo].List[sound_key], sound_data)
