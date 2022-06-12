@@ -2,7 +2,9 @@ local data = chatsounds.Module("Data")
 
 data.Repositories = {}
 data.Lookup = {
-	List = {},
+	List = {
+		["sh"] = {} -- needed for stopping sounds
+	},
 	Tree = {},
 }
 
@@ -164,7 +166,9 @@ end
 local function merge_repos()
 	return chatsounds.Runners.Execute(function()
 		local lookup = {
-			List = {},
+			List = {
+				["sh"] = {} -- needed for stopping sounds
+			},
 			Tree = {},
 		}
 

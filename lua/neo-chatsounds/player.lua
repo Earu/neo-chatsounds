@@ -19,6 +19,11 @@ local function play_sound_group_async(ply, sound_group)
 	if sound_group.Type ~= "group" then return end
 
 	for _, sound_data in pairs(sound_group.Sounds) do
+		if sound_data.Key == "sh" then
+			chatsounds.WebAudio.Panic()
+			continue
+		end
+
 		local _sound = get_wanted_sound(sound_data)
 		local sound_dir_path = _sound.Path:GetPathFromFilename()
 		if not file.Exists(sound_dir_path, "DATA") then
@@ -61,9 +66,15 @@ function cs_player.PlayAsync(ply, str)
 	return t
 end
 
+local CONTEXT_SEPARATOR = ";"
 hook.Add("OnPlayerChat", "chatsounds.Player", function(ply, text)
+	if text[1] == CONTEXT_SEPARATOR then return end
+
 	local start_time = SysTime()
-	cs_player.PlayAsync(ply, text):next(function()
-		chatsounds.Log("parsed and played sounds in " .. (SysTime() - start_time) .. "s")
-	end)
+	local text_chunks = text:Split(CONTEXT_SEPARATOR)
+	for _, chunk in ipairs(text_chunks) do
+		cs_player.PlayAsync(ply, chunk):next(function()
+			chatsounds.Log("parsed and played sounds in " .. (SysTime() - start_time) .. "s")
+		end)
+	end
 end)
