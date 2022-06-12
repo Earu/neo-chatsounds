@@ -7,6 +7,8 @@ function runners.Execute(fn, ...)
 	local co = coroutine.create(function() fn(unpack(args)) end)
 	local runner_name = ("chatsounds.Runner[%d]"):format(runner_id)
 
+	runner_id = runner_id + 1
+
 	local t = chatsounds.Tasks.new()
 	hook.Add("Think", runner_name, function()
 		local status, result = coroutine.resume(co)

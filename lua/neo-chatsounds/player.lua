@@ -3,7 +3,7 @@ if not CLIENT then return end
 local cs_player = chatsounds.Module("Player")
 
 local function get_wanted_sound(sound_data)
-	local matching_sounds = chatsounds.Data.Lookup[sound_data.Key]
+	local matching_sounds = chatsounds.Data.Lookup.List[sound_data.Key]
 
 	local index = math.random(#matching_sounds)
 	for _, modifier in ipairs(sound_data.Modifiers) do

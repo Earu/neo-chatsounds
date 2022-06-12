@@ -1,21 +1,27 @@
 local data = chatsounds.Module("Data")
 
-data.Lookup = {}
+data.Repositories = {}
+data.Lookup = {
+	List = {},
+	Tree = {},
+}
 
-function data.CacheLookup()
-	if not file.Exists("chatsounds", "DATA") then
-		file.CreateDir("chatsounds")
+function data.CacheRepository(repo)
+	if not file.Exists("chatsounds/repos", "DATA") then
+		file.CreateDir("chatsounds/repos")
 	end
 
-	local json = chatsounds.Json.encode(data.Lookup)
-	file.Write("chatsounds/lookup.json", json)
+	local json = chatsounds.Json.encode(data.Repositories[repo])
+	file.Write("chatsounds/repos/" .. util.SHA1(repo) .. ".json", json)
 end
 
-function data.LoadCachedLookup()
-	if not file.Exists("chatsounds/lookup.json", "DATA") then return end
+function data.LoadCachedRepository(repo)
+	local repo_cache_path = "chatsounds/repos/" .. util.SHA1(repo) .. ".json"
 
-	local json = file.Read("chatsounds/lookup.json", "DATA")
-	data.Lookup = chatsounds.Json.decode(json)
+	if not file.Exists(repo_cache_path, "DATA") then return end
+
+	local json = file.Read(repo_cache_path, "DATA")
+	data.Repositories[repo] = chatsounds.Json.decode(json)
 end
 
 local function url_encode(str)
@@ -35,6 +41,18 @@ local function url_encode(str)
 	return str
 end
 
+local function update_loading_state()
+	if data.Loading then
+		data.Loading.Current = data.Loading.Current + 1
+
+		local cur_perc = math.Round((data.Loading.Current / data.Loading.Target) * 100)
+		if cur_perc % 10 == 0 and cur_perc ~= data.Loading.LastLoggedPercent and (CLIENT or (SERVER and game.IsDedicated())) then
+			data.Loading.LastLoggedPercent = cur_perc
+			chatsounds.Log((data.Loading.Text):format(cur_perc))
+		end
+	end
+end
+
 function data.BuildFromGithub(repo, branch, force_recompile)
 	branch = branch or "master"
 
@@ -49,8 +67,8 @@ function data.BuildFromGithub(repo, branch, force_recompile)
 			end
 
 			timer.Simple(delay + 1, function()
-				data.BuildFromGithub(repo, branch):next(function(recompiled)
-					t:resolve(recompiled)
+				data.BuildFromGithub(repo, branch):next(function()
+					t:resolve()
 				end, function(err)
 					t:reject(err)
 				end)
@@ -60,12 +78,23 @@ function data.BuildFromGithub(repo, branch, force_recompile)
 			return
 		end
 
-		local cookie_name = ("chatsounds_[%s]_[%s]"):format(repo, branch)
 		local hash = util.SHA1(res.Body)
-		if not force_recompile and cookie.GetString(cookie_name) == hash and file.Exists("chatsounds/lookup.json", "DATA") then
-			chatsounds.Log(("%s/%s, no changes detected, not re-compiling lists"):format(repo, branch))
-			t:resolve(false)
-			return
+		local cache_path = ("chatsounds/repos/%s.json"):format(util.SHA1(repo))
+		if not force_recompile and file.Exists(cache_path, "DATA") then
+			chatsounds.Log(("Found cached repository for %s, validating content..."):format(repo))
+
+			local cache_contents = file.Read(cache_path, "DATA")
+			local cached_repo = chatsounds.Json.decode(cache_contents)
+			local cached_hash = cached_repo.Hash
+			if cached_hash == hash then
+				chatsounds.Log(("%s is up to date, not re-compiling lists"):format(repo))
+				data.LoadCachedRepository(repo)
+				t:resolve()
+
+				return
+			else
+				chatsounds.Log(("Cached repository for %s is out of date, re-compiling..."):format(repo))
+			end
 		end
 
 		local resp = chatsounds.Json.decode(res.Body)
@@ -81,21 +110,18 @@ function data.BuildFromGithub(repo, branch, force_recompile)
 		local start_time = SysTime()
 		local sound_count = 0
 		chatsounds.Runners.Execute(function()
+			if not data.Repositories[repo] then
+				data.Repositories[repo] = {
+					Hash = hash,
+					Tree = {},
+					List = {},
+				}
+			end
+
 			for i, file_data in pairs(resp.tree) do
-				chatsounds.Runners.Yield()
+				chatsounds.Runners.Yield(250)
 
-				if data.Loading then
-					data.Loading.Current = data.Loading.Current + 1
-
-					local cur_perc = math.Round((data.Loading.Current / data.Loading.Target) * 100)
-					if cur_perc % 5 == 0 and cur_perc ~= data.Loading.LastLoggedPercent and (CLIENT or (SERVER and game.IsDedicated())) then
-						data.Loading.LastLoggedPercent = cur_perc
-
-						local display_perc = math.Round(cur_perc / 5)
-						local display_emaining = 20 - display_perc
-						chatsounds.Log(("[%s%s] %s%%"):format(("="):rep(display_perc), (" "):rep(display_emaining), cur_perc))
-					end
-				end
+				update_loading_state()
 
 				if file_data.path:GetExtensionFromFilename() ~= "ogg" then continue end
 
@@ -109,24 +135,25 @@ function data.BuildFromGithub(repo, branch, force_recompile)
 					realm_chunk_index = realm_chunk_index - 1
 				end
 
-				local sound_key = file_name:gsub("[%_%-]", " "):lower()
-				if not data.Lookup[sound_key] then
-					data.Lookup[sound_key] = {}
+				local sound_key = file_name:gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):lower()
+				if not data.Repositories[repo].List[sound_key] then
+					data.Repositories[repo].List[sound_key] = {}
 				end
 
 				local realm = path_chunks[realm_chunk_index]:lower()
 				local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, table.concat(path_chunks, "/", 1, #path_chunks - 1) .. "/" .. url_encode(path_chunks[#path_chunks]))
 				local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
-				table.insert(data.Lookup[sound_key], {
+				local sound_data = {
 					Url = url,
 					Realm = realm,
 					Cached = file.Exists(sound_path, "DATA")
-				})
+				}
+
+				table.insert(data.Repositories[repo].List[sound_key], sound_data)
 			end
 
-			cookie.Set(cookie_name, hash)
-			t:resolve(true)
-
+			data.CacheRepository(repo)
+			t:resolve()
 			chatsounds.Log(("Compiled %d sounds from %s/%s in %s second(s)"):format(sound_count, repo, branch, tostring(SysTime() - start_time)))
 		end):next(nil, function(err) t:reject(err) end)
 	end, function(err) t:reject(err) end)
@@ -134,30 +161,67 @@ function data.BuildFromGithub(repo, branch, force_recompile)
 	return t
 end
 
-function data.CompileLists(force_recompile)
-	data.LoadCachedLookup() -- always load the cache for the lookup, it will get overriden later if necessary
+local function merge_repos()
+	return chatsounds.Runners.Execute(function()
+		local lookup = {
+			List = {},
+			Tree = {},
+		}
 
+		for _, repo in pairs(data.Repositories) do
+			for sound_key, sound_list in pairs(repo.List) do
+				if not lookup.List[sound_key] then
+					lookup.List[sound_key] = {}
+				end
+
+				for _, sound_data in pairs(sound_list) do
+					chatsounds.Runners.Yield(250)
+					table.insert(lookup[sound_key], sound_data)
+					update_loading_state()
+				end
+
+				local key_chunks = sound_key:Split(" ")
+				local cur_tree_node = lookup.Tree
+				for _, chunk in pairs(key_chunks) do
+					chatsounds.Runners.Yield(250)
+
+					if not cur_tree_node[chunk] then
+						cur_tree_node[chunk] = {}
+					end
+
+					cur_tree_node = cur_tree_node[chunk]
+				end
+			end
+		end
+
+		data.Lookup = lookup
+	end)
+end
+
+function data.CompileLists(force_recompile)
 	data.Loading = {
 		Current = 0,
 		Target = 0,
+		Text = "Loading chatsounds... %d%%",
+		DisplayPerc = true,
 	}
 
 	chatsounds.Tasks.all({
 		data.BuildFromGithub("Metastruct/garrysmod-chatsounds", "master", force_recompile),
 		data.BuildFromGithub("PAC3-Server/chatsounds", "master", force_recompile),
-	}):next(function(results)
-		for _, recompiled in pairs(results) do
-			if recompiled then
-				data.CacheLookup()
-				break
-			end
-		end
+	}):next(function()
+		data.Loading.Current = 0
+		data.Loading.Text = "Merging chatsounds repositories... %d%%"
 
-		data.Loading = nil
-		chatsounds.Log("Done compiling lists")
+		merge_repos():next(function()
+			data.Loading = nil
+			chatsounds.Log("Done compiling all lists")
+		end, function(err)
+			data.Loading = nil
+			chatsounds.Error(err)
+		end)
 	end, function(errors)
 		data.Loading = nil
-
 		for _, err in pairs(errors) do
 			chatsounds.Error(err)
 		end
@@ -173,7 +237,7 @@ hook.Add("InitPostEntity", "chatsounds.Data", function()
 end)
 
 if CLIENT then
-	hook.Add("HUDPaint", "chatsounds.Data", function()
+	hook.Add("HUDPaint", "chatsounds.Data.Loading", function()
 		if not data.Loading then return end
 		if data.Loading.Target == 0 then return end
 		if not LocalPlayer():IsTyping() then return end
@@ -181,11 +245,13 @@ if CLIENT then
 		local chat_x, chat_y = chat.GetChatBoxPos()
 		local _, chat_h = chat.GetChatBoxSize()
 
-		surface.SetFont("DermaLarge")
+		surface.SetFont("DermaDefault")
 		surface.SetTextColor(255, 255, 255, 255)
-		surface.SetTextPos(chat_x, chat_y + chat_h + 20)
+		surface.SetTextPos(chat_x, chat_y + chat_h + 5)
 
-		local text = ("Loading chatsounds... %s%%"):format(math.Round((data.Loading.Current / data.Loading.Target) * 100))
+		local text = (data.Loading.Text):format(math.Round((data.Loading.Current / data.Loading.Target) * 100))
 		surface.DrawText(text)
 	end)
+
+
 end
