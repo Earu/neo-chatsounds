@@ -47,7 +47,7 @@ local function update_loading_state()
 	if data.Loading then
 		data.Loading.Current = data.Loading.Current + 1
 
-		local cur_perc = math.Round((data.Loading.Current / data.Loading.Target) * 100)
+		local cur_perc = math.min(100, math.Round((data.Loading.Current / data.Loading.Target) * 100))
 		if cur_perc % 10 == 0 and cur_perc ~= data.Loading.LastLoggedPercent and (CLIENT or (SERVER and game.IsDedicated())) then
 			data.Loading.LastLoggedPercent = cur_perc
 			chatsounds.Log((data.Loading.Text):format(cur_perc))
@@ -241,6 +241,14 @@ hook.Add("InitPostEntity", "chatsounds.Data", function()
 end)
 
 if CLIENT then
+	surface.CreateFont("chatsounds.Completion", {
+		font = "Roboto",
+		size = 20,
+		weight = 500,
+		antialias = true,
+		additive = true,
+	})
+
 	hook.Add("HUDPaint", "chatsounds.Data.Loading", function()
 		if not data.Loading then return end
 		if data.Loading.Target == 0 then return end
@@ -249,13 +257,91 @@ if CLIENT then
 		local chat_x, chat_y = chat.GetChatBoxPos()
 		local _, chat_h = chat.GetChatBoxSize()
 
-		surface.SetFont("DermaDefault")
+		surface.SetFont("chatsounds.Completion")
 		surface.SetTextColor(255, 255, 255, 255)
 		surface.SetTextPos(chat_x, chat_y + chat_h + 5)
 
-		local text = (data.Loading.Text):format(math.Round((data.Loading.Current / data.Loading.Target) * 100))
+		local text = (data.Loading.Text):format(math.min(100, math.Round((data.Loading.Current / data.Loading.Target) * 100)))
 		surface.DrawText(text)
 	end)
 
+	data.Suggestions = {}
+	hook.Add("ChatTextChanged", "chatsounds.Data.Completion", function(text)
+		--timer.Create("chatsounds.Data.Completion", 0.2, 1, function()
+			data.BuildCompletionSuggestions(text)
+			if table.Count(data.Suggestions) > 0 then
+				print("GENERATED SUGGGEESTIONSSSSS")
+			end
+		--end)
+	end)
 
+	local function add_nested_suggestions(node, base, ret)
+		ret = ret or {}
+		for key, child_node in pairs(node) do
+			if table.Count(child_node) == 0 then
+				table.insert(ret, base .. " " .. key)
+			else
+				add_nested_suggestions(child_node, base .. " " .. key, ret)
+			end
+		end
+
+		return ret
+	end
+
+	function data.BuildCompletionSuggestions(text)
+		text = text:gsub("[%s\n\r\t]+"," ")
+
+		if #text == 0 then
+			data.Suggestions = {}
+			return
+		end
+
+		local tree_node = data.Lookup.Tree
+		local text_chunks = text:Split(" ")
+		local suggestions = {}
+		for i, chunk in ipairs(text_chunks) do
+			local chunk_text = chunk:lower():Trim()
+			if i == #text_chunks then
+				if tree_node[chunk_text] then
+					table.insert(suggestions, text)
+				end
+
+				local base = table.concat(text_chunks, " ", 1, i - 1)
+				print(base)
+				for sound_key, _ in pairs(tree_node) do
+					if not sound_key:StartWith(chunk_text) then continue end
+					add_nested_suggestions(tree_node[sound_key], base, suggestions)
+				end
+			else
+				-- if we're not on the last chunk, we need to check if the next chunk is a valid chatsound
+				local new_tree_node = tree_node[chunk_text]
+				if not new_tree_node then break end
+
+				tree_node = new_tree_node
+			end
+		end
+
+		table.sort(suggestions, function(a, b)
+			return a:len() < b:len()
+		end)
+
+		data.Suggestions = suggestions
+	end
+
+	--local MAX_SUGGESTIONS = 20
+	hook.Add("HUDPaint", "chatsounds.Data.Completion", function()
+		local chat_x, chat_y = chat.GetChatBoxPos()
+		local _, chat_h = chat.GetChatBoxSize()
+
+		surface.SetFont("chatsounds.Completion")
+		surface.SetTextColor(255, 255, 255, 255)
+
+		local base_x, base_y = chat_x, chat_y + chat_h + 5
+		--local max = math.min(#data.Suggestions, MAX_SUGGESTIONS)
+		for i, suggestion in pairs(data.Suggestions) do
+			local _, th = surface.GetTextSize(suggestion)
+			surface.SetTextPos(base_x, base_y + (i - 1) * th)
+			surface.DrawText(suggestion)
+		end
+	end)
 end

@@ -1,4 +1,4 @@
-local chatsounds = {}
+local chatsounds = _G.chatsounds or {}
 _G.chatsounds = chatsounds
 
 local NO_METALOG_HEADER_COLOR = Color(100, 100, 255)

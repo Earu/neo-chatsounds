@@ -19,7 +19,7 @@ local function play_sound_group_async(ply, sound_group)
 	if sound_group.Type ~= "group" then return end
 
 	for _, sound_data in pairs(sound_group.Sounds) do
-		if sound_data.Key == "sh" then
+		if sound_data.Key == "sh" and ply == LocalPlayer() then
 			chatsounds.WebAudio.Panic()
 			continue
 		end
