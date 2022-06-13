@@ -1,7 +1,7 @@
 local data = chatsounds.Module("Data")
 
-data.Repositories = {}
-data.Lookup = {
+data.Repositories = data.Repositories or {}
+data.Lookup = data.Lookup or {
 	List = {
 		["sh"] = {} -- needed for stopping sounds
 	},
@@ -265,7 +265,7 @@ if CLIENT then
 		surface.DrawText(text)
 	end)
 
-	data.Suggestions = {}
+	data.Suggestions = data.Suggestions or {}
 	hook.Add("ChatTextChanged", "chatsounds.Data.Completion", function(text)
 		--timer.Create("chatsounds.Data.Completion", 0.2, 1, function()
 			data.BuildCompletionSuggestions(text)
