@@ -10,4 +10,8 @@ function MODIFIER:ParseArgs(args)
 	return math.max(0, n)
 end
 
+function MODIFIER:OnStreamInit(stream)
+	stream.Overlap = self.Value ~= 0
+end
+
 return MODIFIER

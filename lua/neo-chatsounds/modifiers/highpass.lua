@@ -12,7 +12,7 @@ end
 
 function MODIFIER:OnStreamInit(stream)
 	stram:SetFilterType(2)
-	stram:SetFilterFraction(num)
+	stram:SetFilterFraction(self.Value)
 end
 
 return MODIFIER

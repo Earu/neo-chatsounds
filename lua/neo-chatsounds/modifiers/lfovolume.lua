@@ -12,8 +12,8 @@ function MODIFIER:ParseArgs(args)
 end
 
 function MODIFIER:OnStreamInit(stream)
-	stream:SetVolumeLFOAmount(amount)
-	stream:SetVolumeLFOTime(time)
+	stream:SetVolumeLFOAmount(self.Value[2])
+	stream:SetVolumeLFOTime(self.Value[1])
 end
 
 return MODIFIER

@@ -12,8 +12,8 @@ function MODIFIER:ParseArgs(args)
 end
 
 function MODIFIER:OnStreamInit(stream)
-	stream:SetPitchLFOAmount(amount)
-	stream:SetPitchLFOTime(time)
+	stream:SetPitchLFOAmount(self.Value[2])
+	stream:SetPitchLFOTime(self.Value[1])
 end
 
 return MODIFIER
