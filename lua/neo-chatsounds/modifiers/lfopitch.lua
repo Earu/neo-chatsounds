@@ -11,4 +11,9 @@ function MODIFIER:ParseArgs(args)
 	return { time, amount }
 end
 
+function MODIFIER:OnStreamInit(stream)
+	stream:SetPitchLFOAmount(amount)
+	stream:SetPitchLFOTime(time)
+end
+
 return MODIFIER

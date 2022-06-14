@@ -11,4 +11,9 @@ function MODIFIER:ParseArgs(args)
 	return { time, amount }
 end
 
+function MODIFIER:OnStreamInit(stream)
+	stream:SetVolumeLFOAmount(amount)
+	stream:SetVolumeLFOTime(time)
+end
+
 return MODIFIER
