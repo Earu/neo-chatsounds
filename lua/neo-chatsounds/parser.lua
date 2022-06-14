@@ -223,7 +223,7 @@ local function parse_str(raw_str)
 			scope_handlers[char](raw_str, index, ctx)
 		else
 			local standard_iteration = true
-			if i % 2 == 0 and parse_legacy_modifiers(ctx, char) then
+			if (i % 2 == 0 or i == #raw_str) and parse_legacy_modifiers(ctx, char) then
 				-- check every even index so that we match pairs of chars, ideal for legacy modifiers that are 2 chars max in length and overlap
 				standard_iteration = false
 			end
