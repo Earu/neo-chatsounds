@@ -137,9 +137,10 @@ function data.BuildFromGithub(repo, branch, force_recompile)
 					realm_chunk_index = realm_chunk_index - 1
 				end
 
-				if file_name:match("[a-zA-Z]+") then
-					file_name = file_name:gsub("[0-9]", "")
-				end
+				--[[if file_name:match("^[a-zA-Z]+") then
+					file_name = file_name:gsub("[0-9]+$", ""):Trim()
+					print(file_name)
+				end]]--
 
 				local sound_key = file_name:gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):lower()
 				if not data.Repositories[repo].List[sound_key] then
