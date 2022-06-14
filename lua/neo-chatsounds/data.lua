@@ -137,13 +137,17 @@ function data.BuildFromGithub(repo, branch, force_recompile)
 					realm_chunk_index = realm_chunk_index - 1
 				end
 
+				if file_name:match("[a-zA-Z]+") then
+					file_name = file_name:gsub("[0-9]", "")
+				end
+
 				local sound_key = file_name:gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):lower()
 				if not data.Repositories[repo].List[sound_key] then
 					data.Repositories[repo].List[sound_key] = {}
 				end
 
 				local realm = path_chunks[realm_chunk_index]:lower()
-				local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, table.concat(path_chunks, "/", 1, #path_chunks - 1) .. "/" .. url_encode(path_chunks[#path_chunks]))
+				local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, table.concat(path_chunks, "/", 1, #path_chunks - 1) .. "/" .. url_encode(path_chunks[#path_chunks])):gsub("%s", "%%20")
 				local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
 				local sound_data = {
 					Url = url,
