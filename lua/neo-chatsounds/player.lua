@@ -32,7 +32,13 @@ local function wait_all_tasks_in_order(tasks, callback)
 			finished_task:reject(err)
 		end)
 
-		if callback then callback(task) end
+		if callback then
+			local succ, err = pcall(callback, task)
+			if not succ then
+				finished_task:reject(err)
+				return
+			end
+		end
 	end
 
 	next_task()
@@ -42,7 +48,7 @@ end
 local function get_all_modifiers(sound_group, ret)
 	ret = ret or {}
 
-	for _, modifier in pairs(sound_group.Modifiers) do
+	for _, modifier in ipairs(sound_group.Modifiers or {}) do
 		table.insert(ret, modifier)
 	end
 
@@ -90,24 +96,23 @@ local function play_sound_group_async(ply, sound_group)
 
 		local sound_task = chatsounds.Tasks.new()
 		sound_task.Callback = function()
-			local modifiers = get_all_modifiers(sound_group)
+			local modifiers = table.Merge(get_all_modifiers(sound_group), sound_data.Modifiers)
 			local stream = chatsounds.WebAudio.CreateStream("data/" .. _sound.Path)
-			stream:SetSourceEntity(ply)
-			stream:Set3D(true)
-
-			for _, modifier in ipairs(modifiers) do
-				if modifier.OnStreamInit then
-					modifier:OnStreamInit(stream)
-				end
-			end
-
 			local started = false
 			hook.Add("Think", stream, function()
-				if not IsValid(stream) then return end
 				if not stream:IsReady() then return end
 
 				if not started then
-					timer.Simple(stream:GetLength(), function()
+					stream:SetSourceEntity(ply)
+					stream:Set3D(true)
+
+					for _, modifier in ipairs(modifiers) do
+						if modifier.OnStreamInit then
+							modifier:OnStreamInit(stream)
+						end
+					end
+
+					timer.Simple(stream.Duration or stream:GetLength(), function()
 						if IsValid(stream) then
 							stream:Remove()
 						end
