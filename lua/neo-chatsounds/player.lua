@@ -84,7 +84,7 @@ local function play_sound_group_async(ply, sound_group)
 
 			chatsounds.Http.Get(_sound.Url):next(function(res)
 				if res.Status ~= 200 then
-					download_task:reject("Failed to download %s: %d", _sound.Url, res.Status)
+					download_task:reject(("Failed to download %s: %d"):format(_sound.Url, res.Status))
 					return
 				end
 
