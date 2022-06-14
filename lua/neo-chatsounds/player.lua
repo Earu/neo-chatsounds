@@ -78,6 +78,7 @@ local function play_sound_group_async(ply, sound_group)
 		sound_task.Callback = function()
 			local stream = chatsounds.WebAudio.CreateStream("data/" .. _sound.Path)
 			stream:SetSourceEntity(ply)
+			stream:Set3D(true)
 			hook.Add("Think", stream, function()
 				if not IsValid(stream) then return end
 				if not stream:IsReady() then return end
