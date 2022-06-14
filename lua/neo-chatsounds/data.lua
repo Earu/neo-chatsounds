@@ -246,8 +246,41 @@ if CLIENT then
 		size = 20,
 		weight = 500,
 		antialias = true,
-		additive = true,
+		additive = false,
+		extended = true,
+		shadow = true,
 	})
+
+	surface.CreateFont("chatsounds.Completion.Shadow", {
+		font = "Roboto",
+		size = 20,
+		weight = 500,
+		antialias = true,
+		additive = false,
+		blursize = 1,
+		extended = true,
+		shadow = true,
+	})
+
+	local SHADOW_COLOR = Color(0, 0, 0, 255)
+	local surface_SetFont = surface.SetFont
+	local surface_SetTextPos = surface.SetTextPos
+	local surface_SetTextColor = surface.SetTextColor
+	local surface_DrawText = surface.DrawText
+	local function draw_shadowed_text(text, x, y, r, g, b, a)
+		surface_SetFont("chatsounds.Completion.Shadow")
+		surface_SetTextColor(SHADOW_COLOR)
+
+		for _ = 1, 5 do
+			surface_SetTextPos(x, y)
+			surface_DrawText(text)
+		end
+
+		surface_SetFont("chatsounds.Completion")
+		surface_SetTextColor(r, g, b, a)
+		surface_SetTextPos(x, y)
+		surface_DrawText(text)
+	end
 
 	hook.Add("HUDPaint", "chatsounds.Data.Loading", function()
 		if not data.Loading then return end
@@ -256,30 +289,29 @@ if CLIENT then
 
 		local chat_x, chat_y = chat.GetChatBoxPos()
 		local _, chat_h = chat.GetChatBoxSize()
-
-		surface.SetFont("chatsounds.Completion")
-		surface.SetTextColor(255, 255, 255, 255)
-		surface.SetTextPos(chat_x, chat_y + chat_h + 5)
-
 		local text = (data.Loading.Text):format(math.min(100, math.Round((data.Loading.Current / data.Loading.Target) * 100)))
-		surface.DrawText(text)
+		draw_shadowed_text(text, chat_x, chat_y + chat_h + 5, 255, 255, 255, 255)
 	end)
 
 	data.Suggestions = data.Suggestions or {}
+	data.SuggestionsIndex = -1
 	hook.Add("ChatTextChanged", "chatsounds.Data.Completion", function(text)
-		--timer.Create("chatsounds.Data.Completion", 0.2, 1, function()
-			data.BuildCompletionSuggestions(text)
-			if table.Count(data.Suggestions) > 0 then
-				print("GENERATED SUGGGEESTIONSSSSS")
-			end
-		--end)
+		data.BuildCompletionSuggestions(text)
 	end)
 
+	hook.Add("OnChatTab", "chatsounds.Data.Completion", function(text)
+		local scroll = (input.IsButtonDown(KEY_LSHIFT) or input.IsButtonDown(KEY_RSHIFT) or input.IsKeyDown(KEY_LCONTROL)) and -1 or 1
+		data.SuggestionsIndex = (data.SuggestionsIndex + scroll) % #data.Suggestions
+
+		return data.Suggestions[data.SuggestionsIndex + 1]
+	end)
+
+	local table_count = table.Count
 	local function add_nested_suggestions(node, base, ret)
 		ret = ret or {}
 		for key, child_node in pairs(node) do
-			if table.Count(child_node) == 0 then
-				table.insert(ret, base .. " " .. key)
+			if table_count(child_node) == 0 then
+				table.insert(ret, (base .. " " .. key):Trim())
 			else
 				add_nested_suggestions(child_node, base .. " " .. key, ret)
 			end
@@ -288,11 +320,13 @@ if CLIENT then
 		return ret
 	end
 
+	local completion_sepatator = "=================="
 	function data.BuildCompletionSuggestions(text)
 		text = text:gsub("[%s\n\r\t]+"," ")
 
 		if #text == 0 then
 			data.Suggestions = {}
+			data.SuggestionsIndex = -1
 			return
 		end
 
@@ -302,15 +336,14 @@ if CLIENT then
 		for i, chunk in ipairs(text_chunks) do
 			local chunk_text = chunk:lower():Trim()
 			if i == #text_chunks then
-				if tree_node[chunk_text] then
-					table.insert(suggestions, text)
-				end
-
 				local base = table.concat(text_chunks, " ", 1, i - 1)
-				print(base)
-				for sound_key, _ in pairs(tree_node) do
+				for sound_key, child_node in pairs(tree_node) do
 					if not sound_key:StartWith(chunk_text) then continue end
-					add_nested_suggestions(tree_node[sound_key], base, suggestions)
+					if table_count(child_node) > 0 then
+						add_nested_suggestions(child_node, base .. " " .. sound_key, suggestions)
+					else
+						table.insert(suggestions, (base .. " " .. sound_key):Trim())
+					end
 				end
 			else
 				-- if we're not on the last chunk, we need to check if the next chunk is a valid chatsound
@@ -325,23 +358,51 @@ if CLIENT then
 			return a:len() < b:len()
 		end)
 
+		completion_sepatator = ("="):rep((suggestions[#suggestions] or "=================="):len() + 5)
+
+		data.SuggestionsIndex = -1
 		data.Suggestions = suggestions
 	end
 
-	--local MAX_SUGGESTIONS = 20
+	local FONT_HEIGHT = 20
 	hook.Add("HUDPaint", "chatsounds.Data.Completion", function()
+		if #data.Suggestions == 0 then return end
+
 		local chat_x, chat_y = chat.GetChatBoxPos()
 		local _, chat_h = chat.GetChatBoxSize()
 
-		surface.SetFont("chatsounds.Completion")
-		surface.SetTextColor(255, 255, 255, 255)
-
+		local i = 1
 		local base_x, base_y = chat_x, chat_y + chat_h + 5
-		--local max = math.min(#data.Suggestions, MAX_SUGGESTIONS)
-		for i, suggestion in pairs(data.Suggestions) do
-			local _, th = surface.GetTextSize(suggestion)
-			surface.SetTextPos(base_x, base_y + (i - 1) * th)
-			surface.DrawText(suggestion)
+		for index = data.SuggestionsIndex + 1, #data.Suggestions + (#data.Suggestions - data.SuggestionsIndex + 1) do
+			local suggestion = data.Suggestions[index]
+			if not suggestion then continue end
+
+			local x, y = base_x, base_y + (i - 1) * FONT_HEIGHT
+			draw_shadowed_text(("%03d."):format(index), x, y, 200, 200, 255, 255)
+
+			if index == data.SuggestionsIndex + 1 then
+				draw_shadowed_text(suggestion, x + 50, y, 255, 0, 0, 255)
+			else
+				draw_shadowed_text(suggestion, x + 50, y, 255, 255, 255, 255)
+			end
+
+			i = i + 1
+		end
+
+		if data.SuggestionsIndex + 1 ~= 1 then
+			draw_shadowed_text(completion_sepatator, base_x, base_y + (i - 1) * FONT_HEIGHT, 180, 180, 255, 255)
+			i = i + 1
+		end
+
+		for j = 1, data.SuggestionsIndex do
+			local suggestion = data.Suggestions[j]
+			if not suggestion then continue end
+
+			local x, y = base_x, base_y + (i - 1) * FONT_HEIGHT
+			draw_shadowed_text(("%03d."):format(j), x, y, 200, 200, 255, 255)
+			draw_shadowed_text(suggestion, x + 50, y, 255, 255, 255, 255)
+
+			i = i + 1
 		end
 	end)
 end
