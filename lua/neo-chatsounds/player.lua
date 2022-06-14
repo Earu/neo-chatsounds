@@ -15,9 +15,35 @@ local function get_wanted_sound(sound_data)
 	return matching_sounds[math.min(math.max(1, index), #matching_sounds)]
 end
 
+local function wait_for_all_tasks(tasks, callback)
+	local i = 1
+	local finished_task = chatsounds.Tasks.new()
+	local function next_task()
+		local task = tasks[i]
+		if not task then
+			finished_task:resolve()
+			return
+		end
+
+		task:next(function()
+			i = i + 1
+			next_task()
+		end, function(err)
+			finished_task:reject(err)
+		end)
+
+		if callback then callback(task) end
+	end
+
+	next_task()
+	return finished_task
+end
+
 local function play_sound_group_async(ply, sound_group)
 	if sound_group.Type ~= "group" then return end
 
+	local download_tasks = {}
+	local sound_tasks = {}
 	for _, sound_data in pairs(sound_group.Sounds) do
 		if sound_data.Key == "sh" and ply == LocalPlayer() then
 			chatsounds.WebAudio.Panic()
@@ -30,9 +56,12 @@ local function play_sound_group_async(ply, sound_group)
 			file.CreateDir(sound_dir_path)
 		end
 
-		local download_task = chatsounds.Tasks.new()
 		if not file.Exists(_sound.Path, "DATA") then
 			chatsounds.Log("Downloading %s", _sound.Url)
+
+			local download_task = chatsounds.Tasks.new()
+			table.insert(download_tasks, download_task)
+
 			chatsounds.Http.Get(_sound.Url):next(function(res)
 				if res.Status ~= 200 then
 					download_task:reject("Failed to download %s: %d", _sound.Url, res.Status)
@@ -43,16 +72,37 @@ local function play_sound_group_async(ply, sound_group)
 				chatsounds.Log("Downloaded %s", _sound.Url)
 				download_task:resolve()
 			end, chatsounds.Error)
-		else
-			download_task:resolve()
 		end
 
-		download_task:next(function()
+		local sound_task = chatsounds.Tasks.new()
+		sound_task.Callback = function()
 			local stream = chatsounds.WebAudio.CreateStream("data/" .. _sound.Path)
-			stream:Play()
-			-- modifier bs ?
-		end)
+			hook.Add("Think", stream, function()
+				if not stream:IsReady() then return end
+
+				timer.Simple(stream:GetLength(), function()
+					--stream:Stop()
+					sound_task:resolve()
+				end)
+
+				stream:Play()
+				hook.Remove("Think", stream)
+			end)
+		end
+
+		table.insert(sound_tasks, sound_task)
 	end
+
+	local finished_task = chatsounds.Tasks.new()
+	wait_for_all_tasks(download_tasks):next(function()
+		wait_for_all_tasks(sound_tasks, function(task)
+			task.Callback()
+		end):next(function()
+			finished_task:resolve()
+		end, function(err) finished_task:reject(err) end)
+	end, function(err) finished_task:reject(err) end)
+
+	return finished_task
 end
 
 function cs_player.PlayAsync(ply, str)
