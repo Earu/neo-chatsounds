@@ -11,4 +11,10 @@ function MODIFIER:ParseArgs(args)
 	return { echo_delay, echo_feedback }
 end
 
+function MODIFIER:OnStreamInit(stream)
+	stream:SetEcho(true)
+	stream:SetEchoDelay(self.Value[1])
+	stream:SetEchoFeedback(self.Value[2])
+end
+
 return MODIFIER

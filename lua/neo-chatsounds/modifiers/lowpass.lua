@@ -10,4 +10,9 @@ function MODIFIER:ParseArgs(args)
 	return math.min(1, cutoff)
 end
 
+function MODIFIER:OnStreamInit(stream)
+	stream:SetFilterType(1)
+	stream:SetFilterFraction(num)
+end
+
 return MODIFIER
