@@ -15,7 +15,7 @@ local function get_wanted_sound(sound_data)
 	return matching_sounds[math.min(math.max(1, index), #matching_sounds)]
 end
 
-local function wait_for_all_tasks(tasks, callback)
+local function wait_all_tasks_in_order(tasks, callback)
 	local i = 1
 	local finished_task = chatsounds.Tasks.new()
 	local function next_task()
@@ -77,11 +77,13 @@ local function play_sound_group_async(ply, sound_group)
 		local sound_task = chatsounds.Tasks.new()
 		sound_task.Callback = function()
 			local stream = chatsounds.WebAudio.CreateStream("data/" .. _sound.Path)
+			stream:SetSourceEntity(ply)
 			hook.Add("Think", stream, function()
+				if not IsValid(stream) then return end
 				if not stream:IsReady() then return end
 
 				timer.Simple(stream:GetLength(), function()
-					stream:Remove()
+					if IsValid(stream) then stream:Remove() end
 					sound_task:resolve()
 				end)
 
@@ -94,8 +96,8 @@ local function play_sound_group_async(ply, sound_group)
 	end
 
 	local finished_task = chatsounds.Tasks.new()
-	wait_for_all_tasks(download_tasks):next(function()
-		wait_for_all_tasks(sound_tasks, function(task)
+	wait_all_tasks_in_order(download_tasks):next(function()
+		wait_all_tasks_in_order(sound_tasks, function(task)
 			task.Callback()
 		end):next(function()
 			finished_task:resolve()
@@ -120,11 +122,8 @@ local CONTEXT_SEPARATOR = ";"
 hook.Add("OnPlayerChat", "chatsounds.Player", function(ply, text)
 	if text[1] == CONTEXT_SEPARATOR then return end
 
-	local start_time = SysTime()
 	local text_chunks = text:Split(CONTEXT_SEPARATOR)
 	for _, chunk in ipairs(text_chunks) do
-		cs_player.PlayAsync(ply, chunk):next(function()
-			chatsounds.Log("parsed and played sounds in " .. (SysTime() - start_time) .. "s")
-		end)
+		cs_player.PlayAsync(ply, chunk)
 	end
 end)
