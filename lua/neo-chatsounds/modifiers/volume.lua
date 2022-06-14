@@ -18,4 +18,8 @@ function MODIFIER:LegacyParseArgs(args)
 	return 1
 end
 
+function MODIFIER:OnStreamThink(stream)
+	stream:SetVolume(self.Value)
+end
+
 return MODIFIER

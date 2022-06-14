@@ -6,9 +6,21 @@ MODIFIER.DefaultValue = 100
 
 function MODIFIER:ParseArgs(args)
 	local pitch = tonumber(args)
-	if not pitch then return 100 end
+	if not pitch then return 1 end
 
-	return math.min(math.max(1, pitch), 255)
+	return math.min(math.max(0, pitch), 5)
+end
+
+function MODIFIER:OnStreamInit(stream)
+	if not stream.Duration then
+		stream.Duration = stream:GetLength()
+	end
+
+	stream.Duration = stream.Duration / math.abs(self.Value)
+end
+
+function MODIFIER:OnStreamThink(stream)
+	stream:SetPlaybackRate(self.Value)
 end
 
 return MODIFIER
