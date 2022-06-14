@@ -81,7 +81,7 @@ local function play_sound_group_async(ply, sound_group)
 				if not stream:IsReady() then return end
 
 				timer.Simple(stream:GetLength(), function()
-					--stream:Stop()
+					stream:Remove()
 					sound_task:resolve()
 				end)
 
