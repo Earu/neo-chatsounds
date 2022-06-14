@@ -105,6 +105,7 @@ local function play_sound_group_async(ply, sound_group)
 				if not started then
 					stream:SetSourceEntity(ply)
 					stream:Set3D(true)
+					stream.Duration = stream:GetLength()
 
 					for _, modifier in ipairs(modifiers) do
 						if modifier.OnStreamInit then
@@ -112,7 +113,7 @@ local function play_sound_group_async(ply, sound_group)
 						end
 					end
 
-					timer.Simple(stream.Duration or stream:GetLength(), function()
+					timer.Simple(stream.Duration, function()
 						if IsValid(stream) then
 							stream:Remove()
 						end

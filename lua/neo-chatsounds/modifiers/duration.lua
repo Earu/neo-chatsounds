@@ -12,10 +12,12 @@ function MODIFIER:ParseArgs(args)
 end
 
 function MODIFIER:OnStreamInit(stream)
-	if self.Value == -1 then
-		stream.Duration = stream:GetLength()
-	else
+	if self.Value ~= -1 then
 		stream.Duration = self.Value
+	end
+
+	if self.IsLegacy then
+		stream.Overlap = true
 	end
 end
 

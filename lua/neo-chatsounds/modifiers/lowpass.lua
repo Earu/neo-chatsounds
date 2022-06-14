@@ -12,7 +12,7 @@ end
 
 function MODIFIER:OnStreamInit(stream)
 	stream:SetFilterType(1)
-	stream:SetFilterFraction(num)
+	stream:SetFilterFraction(self.Value)
 end
 
 return MODIFIER

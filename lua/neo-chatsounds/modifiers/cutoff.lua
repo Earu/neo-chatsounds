@@ -12,10 +12,6 @@ function MODIFIER:ParseArgs(args)
 end
 
 function MODIFIER:OnStreamInit(stream)
-	if not stream.Duration then
-		stream.Duration = stream:GetLength()
-	end
-
 	stream.Duration = stream.Duration * (self.Value / 100)
 end
 
