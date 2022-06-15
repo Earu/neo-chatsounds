@@ -29,23 +29,6 @@ function data.LoadCachedRepository(repo)
 	data.Repositories[repo] = chatsounds.Json.decode(json)
 end
 
-local function url_encode(str)
-	-- ensure all newlines are in CRLF form
-	str = str:gsub("\r?\n", "\r\n")
-
-	-- percent-encode all non-unreserved characters
-	-- as per RFC 3986, Section 2.3
-	-- (except for space, which gets plus-encoded)
-	str = str:gsub("([^%w%-%.%_%~ ])", function(c)
-		return ("%%%02X"):format(c:byte())
-	end)
-
-	-- convert spaces to their encoded form
-	str = str:gsub("%s", "%%20")
-
-	return str
-end
-
 local function update_loading_state()
 	if data.Loading then
 		data.Loading.Current = data.Loading.Current + 1
@@ -58,7 +41,7 @@ local function update_loading_state()
 	end
 end
 
-function data.BuildFromGithub(repo, branch, force_recompile)
+function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 	branch = branch or "master"
 
 	local api_url = ("https://api.github.com/repos/%s/git/trees/%s?recursive=1"):format(repo, branch)
@@ -72,7 +55,7 @@ function data.BuildFromGithub(repo, branch, force_recompile)
 			end
 
 			timer.Simple(delay + 1, function()
-				data.BuildFromGithub(repo, branch):next(function()
+				data.BuildFromGithub(repo, branch, base_path, force_recompile):next(function()
 					t:resolve()
 				end, function(err)
 					t:reject(err)
@@ -132,25 +115,16 @@ function data.BuildFromGithub(repo, branch, force_recompile)
 
 				sound_count = sound_count + 1
 
-				local path_chunks = file_data.path:Split("/")
-				local realm_chunk_index = #path_chunks - 1
-				local file_name = file_data.path:GetFileFromFilename():gsub("%.ogg$", "")
-				if tonumber(file_name) then
-					file_name = path_chunks[#path_chunks - 1]
-					realm_chunk_index = realm_chunk_index - 1
-				end
+				local path = file_data.path:gsub("^" .. base_path:PatternSafe(), "")
+				local path_chunks = path:Split("/")
+				local realm = path_chunks[2]:lower()
+				local sound_key = path_chunks[3]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " ")
 
-				if file_name:match("^[a-zA-Z]+") then
-					file_name = file_name:gsub("[0-9]+$", ""):Trim()
-				end
-
-				local sound_key = file_name:gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):lower():Trim()
 				if not data.Repositories[repo].List[sound_key] then
 					data.Repositories[repo].List[sound_key] = {}
 				end
 
-				local realm = path_chunks[realm_chunk_index]:lower()
-				local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, table.concat(path_chunks, "/", 1, #path_chunks - 1) .. "/" .. url_encode(path_chunks[#path_chunks])):gsub("%s", "%%20")
+				local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, file_data.path):gsub("%s", "%%20")
 				local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
 				local sound_data = {
 					Url = url,
@@ -240,8 +214,8 @@ function data.CompileLists(force_recompile)
 	}
 
 	chatsounds.Tasks.all({
-		data.BuildFromGithub("Metastruct/garrysmod-chatsounds", "master", force_recompile),
-		data.BuildFromGithub("PAC3-Server/chatsounds", "master", force_recompile),
+		data.BuildFromGithub("Metastruct/garrysmod-chatsounds", "master", "sound/chatsounds/autoadd", force_recompile),
+		data.BuildFromGithub("PAC3-Server/chatsounds", "master", "sounds/chatsounds", force_recompile),
 	}):next(function()
 		data.Loading.Current = 0
 		data.Loading.Text = "Merging chatsounds repositories... %d%%"
