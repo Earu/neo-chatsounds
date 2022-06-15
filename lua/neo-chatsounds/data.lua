@@ -156,6 +156,7 @@ local function merge_repos()
 			},
 		}
 
+		local words = {}
 		for _, repo in pairs(data.Repositories) do
 			for sound_key, sound_list in pairs(repo.List) do
 				if not lookup.List[sound_key] then
@@ -171,7 +172,6 @@ local function merge_repos()
 				if CLIENT then
 					local key_chunks = sound_key:Split(" ")
 					local cur_tree_node = lookup.Tree
-					local words = {}
 					for i, chunk in pairs(key_chunks) do
 						chatsounds.Runners.Yield(250)
 
@@ -421,6 +421,8 @@ if CLIENT then
 			if not suggestion then continue end
 
 			local x, y = base_x, base_y + (i - 1) * FONT_HEIGHT
+			if y > ScrH() then return end
+
 			draw_shadowed_text(("%03d."):format(index), x, y, 200, 200, 255, 255)
 
 			if index == data.SuggestionsIndex + 1 then
@@ -442,6 +444,8 @@ if CLIENT then
 			if not suggestion then continue end
 
 			local x, y = base_x, base_y + (i - 1) * FONT_HEIGHT
+			if y > ScrH() then return end
+
 			draw_shadowed_text(("%03d."):format(j), x, y, 200, 200, 255, 255)
 			draw_shadowed_text(suggestion, x + 50, y, 255, 255, 255, 255)
 
