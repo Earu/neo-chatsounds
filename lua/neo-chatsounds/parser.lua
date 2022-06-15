@@ -167,12 +167,17 @@ local function parse_legacy_modifiers(ctx, char)
 
 	local found_modifier
 	local modifier_start_index = 0
+	local used_current_char = true
 	if modifier_lookup[char] then
 		found_modifier = modifier_lookup[char]
 		modifier_start_index = 0
 	elseif modifier_lookup[char .. ctx.CurrentStr[1]] then
 		found_modifier = modifier_lookup[char .. ctx.CurrentStr[1]]
 		modifier_start_index = 1
+	elseif modifier_lookup[ctx.CurrentStr[1]] then
+		found_modifier = modifier_lookup[ctx.CurrentStr[1]]
+		modifier_start_index = 1
+		used_current_char = false
 	end
 
 	if found_modifier then
@@ -189,7 +194,7 @@ local function parse_legacy_modifiers(ctx, char)
 		ctx.CurrentStr = args_end_index and ctx.CurrentStr:sub(ctx.LastCurrentStrSpaceIndex + 1) or ""
 		ctx.LastCurrentStrSpaceIndex = -1
 
-		return true
+		return true, used_current_char
 	end
 
 	return false
@@ -223,9 +228,10 @@ local function parse_str(raw_str)
 			scope_handlers[char](raw_str, index, ctx)
 		else
 			local standard_iteration = true
-			if (i % 2 == 0 or i == #raw_str) and parse_legacy_modifiers(ctx, char) then
-				-- check every even index so that we match pairs of chars, ideal for legacy modifiers that are 2 chars max in length and overlap
-				standard_iteration = false
+			-- check every even index so that we match pairs of chars, ideal for legacy modifiers that are 2 chars max in length and overlap
+			if i % 2 == 0 or i == #raw_str then
+				local _, used_current_char = parse_legacy_modifiers(ctx, char)
+				standard_iteration = not used_current_char
 			end
 
 			if standard_iteration then
