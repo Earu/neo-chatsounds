@@ -105,7 +105,7 @@ if CLIENT then
 			end
 
 			if not file.Exists(_sound.Path, "DATA") then
-				chatsounds.Log("Downloading %s", _sound.Url)
+				chatsounds.Log(("Downloading %s"):format(_sound.Url))
 
 				local download_task = chatsounds.Tasks.new()
 				table.insert(download_tasks, download_task)
@@ -117,7 +117,7 @@ if CLIENT then
 					end
 
 					file.Write(_sound.Path, res.Body)
-					chatsounds.Log("Downloaded %s", _sound.Url)
+					chatsounds.Log(("Downloaded %s"):format(_sound.Url))
 					download_task:resolve()
 				end, function(err) download_task:reject(err) end)
 			end
