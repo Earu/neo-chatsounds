@@ -5,7 +5,10 @@ data.Lookup = data.Lookup or {
 	List = {
 		["sh"] = {} -- needed for stopping sounds
 	},
-	Tree = {},
+	Tree = {
+		Children = {},
+		EndNode = false,
+	},
 }
 
 function data.CacheRepository(repo)
@@ -137,12 +140,11 @@ function data.BuildFromGithub(repo, branch, force_recompile)
 					realm_chunk_index = realm_chunk_index - 1
 				end
 
-				--[[if file_name:match("^[a-zA-Z]+") then
+				if file_name:match("^[a-zA-Z]+") then
 					file_name = file_name:gsub("[0-9]+$", ""):Trim()
-					print(file_name)
-				end]]--
+				end
 
-				local sound_key = file_name:gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):lower()
+				local sound_key = file_name:gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):lower():Trim()
 				if not data.Repositories[repo].List[sound_key] then
 					data.Repositories[repo].List[sound_key] = {}
 				end
@@ -174,7 +176,10 @@ local function merge_repos()
 			List = {
 				["sh"] = {} -- needed for stopping sounds
 			},
-			Tree = {},
+			Tree = {
+				Children = {},
+				EndNode = false,
+			},
 		}
 
 		for _, repo in pairs(data.Repositories) do
@@ -189,16 +194,35 @@ local function merge_repos()
 					update_loading_state()
 				end
 
-				local key_chunks = sound_key:Split(" ")
-				local cur_tree_node = lookup.Tree
-				for _, chunk in pairs(key_chunks) do
-					chatsounds.Runners.Yield(250)
+				if CLIENT then
+					local key_chunks = sound_key:Split(" ")
+					local cur_tree_node = lookup.Tree
+					local words = {}
+					for i, chunk in pairs(key_chunks) do
+						chatsounds.Runners.Yield(250)
 
-					if not cur_tree_node[chunk] then
-						cur_tree_node[chunk] = {}
+						if not words[chunk] then
+							words[chunk] = {}
+						end
+
+						table.insert(words[chunk], sound_key)
+
+						if not cur_tree_node.Children[chunk] then
+							cur_tree_node.Children[chunk] = {
+								Children = {},
+								Keys = words[chunk],
+								EndNode = false,
+							}
+						end
+
+						cur_tree_node = cur_tree_node.Children[chunk]
+
+						if i == #key_chunks then
+							cur_tree_node.EndNode = true
+						end
+
+						table.insert(cur_tree_node.Keys, sound_key)
 					end
-
-					cur_tree_node = cur_tree_node[chunk]
 				end
 			end
 		end
@@ -225,16 +249,28 @@ function data.CompileLists(force_recompile)
 		merge_repos():next(function()
 			data.Loading = nil
 			chatsounds.Log("Done compiling all lists")
+			hook.Run("ChatsoundsInitialized")
 		end, function(err)
 			data.Loading = nil
 			chatsounds.Error(err)
+			hook.Run("ChatsoundsInitialized")
 		end)
 	end, function(errors)
 		data.Loading = nil
 		for _, err in pairs(errors) do
 			chatsounds.Error(err)
 		end
+		hook.Run("ChatsoundsInitialized")
 	end)
+end
+
+if not concommand.GetTable().chatsounds_recompile_lists then
+	data.Loading = {
+		Current = -1,
+		Target = -1,
+		Text = "Initialising chatsounds...",
+		DisplayPerc = false,
+	}
 end
 
 concommand.Add("chatsounds_recompile_lists", function()
@@ -289,13 +325,16 @@ if CLIENT then
 
 	hook.Add("HUDPaint", "chatsounds.Data.Loading", function()
 		if not data.Loading then return end
-		if data.Loading.Target == 0 then return end
 		if not LocalPlayer():IsTyping() then return end
 
 		local chat_x, chat_y = chat.GetChatBoxPos()
 		local _, chat_h = chat.GetChatBoxSize()
-		local text = (data.Loading.Text):format(math.min(100, math.Round((data.Loading.Current / data.Loading.Target) * 100)))
-		draw_shadowed_text(text, chat_x, chat_y + chat_h + 5, 255, 255, 255, 255)
+		if data.Loading.DisplayPerc then
+			local text = (data.Loading.Text):format(math.min(100, math.Round((data.Loading.Current / data.Loading.Target) * 100)))
+			draw_shadowed_text(text, chat_x, chat_y + chat_h + 5, 255, 255, 255, 255)
+		else
+			draw_shadowed_text(data.Loading.Text, chat_x, chat_y + chat_h + 5, 255, 255, 255, 255)
+		end
 	end)
 
 	data.Suggestions = data.Suggestions or {}
@@ -312,17 +351,23 @@ if CLIENT then
 	end)
 
 	local table_count = table.Count
-	local function add_nested_suggestions(node, base, ret)
-		ret = ret or {}
-		for key, child_node in pairs(node) do
-			if table_count(child_node) == 0 then
-				table.insert(ret, (base .. " " .. key):Trim())
+	local function add_nested_suggestions(node, base, suggestions, existing_suggestions)
+		for key, child_node in pairs(node.Children) do
+			local sound_key = (base .. " " .. key):Trim()
+			if table_count(child_node.Children) == 0 then
+				if not existing_suggestions[sound_key] then
+					table.insert(suggestions, sound_key)
+					existing_suggestions[sound_key] = true
+				end
 			else
-				add_nested_suggestions(child_node, base .. " " .. key, ret)
+				if child_node.EndNode and not existing_suggestions[sound_key] then
+					table.insert(suggestions, sound_key)
+					existing_suggestions[sound_key] = true
+				end
+
+				add_nested_suggestions(child_node, sound_key, suggestions, existing_suggestions)
 			end
 		end
-
-		return ret
 	end
 
 	local completion_sepatator = "=================="
@@ -338,21 +383,39 @@ if CLIENT then
 		local tree_node = data.Lookup.Tree
 		local text_chunks = text:Split(" ")
 		local suggestions = {}
+		local existing_suggestions = {}
 		for i, chunk in ipairs(text_chunks) do
 			local chunk_text = chunk:lower():Trim()
 			if i == #text_chunks then
 				local base = table.concat(text_chunks, " ", 1, i - 1)
-				for sound_key, child_node in pairs(tree_node) do
+				for sound_key, child_node in pairs(tree_node.Children) do
 					if not sound_key:StartWith(chunk_text) then continue end
-					if table_count(child_node) > 0 then
-						add_nested_suggestions(child_node, base .. " " .. sound_key, suggestions)
+
+					local partial_sound_key = (base .. " " .. sound_key):Trim()
+					if table_count(child_node.Children) > 0 then
+						if child_node.EndNode and not existing_suggestions[partial_sound_key] then
+							table.insert(suggestions, partial_sound_key)
+							existing_suggestions[partial_sound_key] = true
+						end
+
+						add_nested_suggestions(child_node, partial_sound_key, suggestions, existing_suggestions)
 					else
-						table.insert(suggestions, (base .. " " .. sound_key):Trim())
+						if not existing_suggestions[partial_sound_key] then
+							table.insert(suggestions, partial_sound_key)
+							existing_suggestions[partial_sound_key] = true
+						end
+					end
+
+					for _, matching_sound_key in ipairs(child_node.Keys) do
+						if matching_sound_key:find(text, 1, true) and not existing_suggestions[matching_sound_key] then
+							table.insert(suggestions, matching_sound_key)
+							existing_suggestions[matching_sound_key] = true
+						end
 					end
 				end
 			else
 				-- if we're not on the last chunk, we need to check if the next chunk is a valid chatsound
-				local new_tree_node = tree_node[chunk_text]
+				local new_tree_node = tree_node.Children[chunk_text]
 				if not new_tree_node then break end
 
 				tree_node = new_tree_node
@@ -371,6 +434,7 @@ if CLIENT then
 
 	local FONT_HEIGHT = 20
 	hook.Add("HUDPaint", "chatsounds.Data.Completion", function()
+		if data.Loading then return end
 		if #data.Suggestions == 0 then return end
 
 		local chat_x, chat_y = chat.GetChatBoxPos()
