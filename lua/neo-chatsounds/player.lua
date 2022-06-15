@@ -3,7 +3,6 @@ if SERVER then
 
 	net.Receive("chatsounds", function(_, ply)
 		local str = net.ReadString()
-
 		local ret = hook.Run("ChatsoundsShouldNetwork", ply, str)
 		if ret == false then return end
 
@@ -21,11 +20,11 @@ end
 if CLIENT then
 	local cs_player = chatsounds.Module("Player")
 
-	local function get_wanted_sound(sound_data)
+	function cs_player.GetWantedSound(sound_data)
 		local matching_sounds = chatsounds.Data.Lookup.List[sound_data.Key]
-
 		local index = math.random(#matching_sounds)
 		local ret_a, ret_b = hook.Run("ChatsoundsOnSelection", index, matching_sounds)
+
 		if isnumber(ret_a) then
 			index = ret_a
 		end
@@ -43,11 +42,17 @@ if CLIENT then
 		return matching_sounds[math.min(math.max(1, index), #matching_sounds)]
 	end
 
-	local function wait_all_tasks_in_order(tasks, callback)
+	local function wait_all_tasks_in_order(tasks)
 		local i = 1
 		local finished_task = chatsounds.Tasks.new()
+		if #tasks == 0 then
+			finished_task:resolve()
+			return finished_task
+		end
+
 		local function next_task()
 			local task = tasks[i]
+
 			if not task then
 				finished_task:resolve()
 				return
@@ -60,8 +65,8 @@ if CLIENT then
 				finished_task:reject(err)
 			end)
 
-			if callback then
-				local succ, err = pcall(callback, task)
+			if task.Callback then
+				local succ, err = pcall(task.Callback, task)
 				if not succ then
 					finished_task:reject(err)
 					return
@@ -87,8 +92,13 @@ if CLIENT then
 		return ret
 	end
 
-	local function play_sound_group_async(ply, sound_group)
-		if sound_group.Type ~= "group" then return end
+	-- TODO: Flatten sound groups so that sounds are played in order even with sub groups
+	function cs_player.PlaySoundGroupAsync(ply, sound_group)
+		local finished_task = chatsounds.Tasks.new()
+		if sound_group.Type ~= "group" then
+			finished_task:resolve()
+			return finished_task
+		end
 
 		local download_tasks = {}
 		local sound_tasks = {}
@@ -98,8 +108,9 @@ if CLIENT then
 				continue
 			end
 
-			local _sound = get_wanted_sound(sound_data)
+			local _sound = cs_player.GetWantedSound(sound_data)
 			local sound_dir_path = _sound.Path:GetPathFromFilename()
+
 			if not file.Exists(sound_dir_path, "DATA") then
 				file.CreateDir(sound_dir_path)
 			end
@@ -119,7 +130,9 @@ if CLIENT then
 					file.Write(_sound.Path, res.Body)
 					chatsounds.Log(("Downloaded %s"):format(_sound.Url))
 					download_task:resolve()
-				end, function(err) download_task:reject(err) end)
+				end, function(err)
+					download_task:reject(err)
+				end)
 			end
 
 			local sound_task = chatsounds.Tasks.new()
@@ -127,6 +140,7 @@ if CLIENT then
 				local modifiers = table.Merge(get_all_modifiers(sound_group), sound_data.Modifiers)
 				local stream = chatsounds.WebAudio.CreateStream("data/" .. _sound.Path)
 				local started = false
+
 				hook.Add("Think", stream, function()
 					if not stream:IsReady() then return end
 
@@ -151,7 +165,6 @@ if CLIENT then
 
 						stream:Play()
 						started = true
-
 						hook.Run("ChatsoundsSoundInit", ply, _sound, stream, sound_data)
 					end
 
@@ -168,14 +181,43 @@ if CLIENT then
 			table.insert(sound_tasks, sound_task)
 		end
 
-		local finished_task = chatsounds.Tasks.new()
-		wait_all_tasks_in_order(download_tasks):next(function()
-			wait_all_tasks_in_order(sound_tasks, function(task)
-				task.Callback()
-			end):next(function()
-				finished_task:resolve()
-			end, function(err) finished_task:reject(err) end)
-		end, function(err) finished_task:reject(err) end)
+		local function recursive_callback()
+			local grp_tasks = {}
+			for _, child_group in ipairs(sound_group.Children) do
+				PrintTable(child_group)
+
+				local child_task = chatsounds.Tasks.new()
+				child_task.Callback = function()
+					cs_player.PlaySoundGroupAsync(ply, child_group):next(function()
+						child_task:resolve()
+					end, function(err)
+						child_task:reject(err)
+					end)
+				end
+
+				table.insert(grp_tasks, child_task)
+			end
+
+			wait_all_tasks_in_order(grp_tasks)
+				:next(
+					function() finished_task:resolve() end,
+					function(err) finished_task:reject(err) end
+				)
+		end
+
+		wait_all_tasks_in_order(download_tasks):next(
+			function()
+				if #sound_tasks > 0 then
+					wait_all_tasks_in_order(sound_tasks):next(
+						recursive_callback,
+						function(err) finished_task:reject(err) end
+					)
+				else
+					recursive_callback()
+				end
+			end,
+			function(err) finished_task:reject(err) end
+		)
 
 		return finished_task
 	end
@@ -183,11 +225,12 @@ if CLIENT then
 	local CONTEXT_SEPARATOR = ";"
 	function cs_player.PlayAsync(ply, text)
 		if text[1] == CONTEXT_SEPARATOR then return end
-
 		local tasks = {}
 		local text_chunks = text:Split(CONTEXT_SEPARATOR)
+
 		for _, chunk in ipairs(text_chunks) do
 			local t = chatsounds.Tasks.new()
+
 			chatsounds.Parser.ParseAsync(chunk):next(function(sound_group)
 				local ret = hook.Run("ChatsoundsShouldPlay", ply, chunk, sound_group)
 				if ret == false then
@@ -195,10 +238,14 @@ if CLIENT then
 					return
 				end
 
-				play_sound_group_async(ply, sound_group):next(function()
+				cs_player.PlaySoundGroupAsync(ply, sound_group):next(function()
 					t:resolve()
-				end, function(err) t:reject(err) end)
-			end, function(err) t:reject(err) end)
+				end, function(err)
+					t:reject(err)
+				end)
+			end, function(err)
+				t:reject(err)
+			end)
 
 			table.insert(tasks, t)
 		end
@@ -214,14 +261,24 @@ if CLIENT then
 
 	hook.Add("OnPlayerChat", "chatsounds.Player", handler)
 
-	concommand.Add("saysound", function(ply, _, _, str) handler(ply, str) end)
-	concommand.Add("chatsounds_say", function(ply, _, _, str) handler(ply, str) end)
+	concommand.Add("saysound", function(ply, _, _, str)
+		handler(ply, str)
+	end)
+
+	concommand.Add("chatsounds_say", function(ply, _, _, str)
+		handler(ply, str)
+	end)
 
 	net.Receive("chatsounds", function()
 		local ply = net.ReadEntity()
 		local text = net.ReadString()
+
 		if not IsValid(ply) then return end
 
-		cs_player.PlayAsync(ply, text)
+		cs_player.PlayAsync(ply, text):next(nil, function(errors)
+			for _, err in ipairs(errors) do
+				chatsounds.Error(err)
+			end
+		end)
 	end)
 end
