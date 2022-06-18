@@ -203,6 +203,8 @@ if CLIENT then
 						end
 
 						hook.Run("ChatsoundsSoundThink", ply, _sound, stream, sound_data)
+
+						stream:UpdateVolume()
 					end)
 				end
 
