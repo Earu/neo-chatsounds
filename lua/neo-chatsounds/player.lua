@@ -92,6 +92,21 @@ if CLIENT then
 		return ret
 	end
 
+	local function flatten_sounds(root, ret)
+		ret = ret or {}
+
+		for _, sound_data in ipairs(root.Sounds) do
+			table.insert(ret, sound_data)
+		end
+
+		for _, sound_group in ipairs(root.Children) do
+			flatten_sounds(sound_group, ret)
+		end
+
+		table.sort(ret, function(a, b) return a.StartIndex < b.StartIndex end)
+		return ret
+	end
+
 	-- TODO: Flatten sound groups so that sounds are played in order even with sub groups
 	function cs_player.PlaySoundGroupAsync(ply, sound_group)
 		local finished_task = chatsounds.Tasks.new()
@@ -102,7 +117,7 @@ if CLIENT then
 
 		local download_tasks = {}
 		local sound_tasks = {}
-		for _, sound_data in pairs(sound_group.Sounds) do
+		for _, sound_data in ipairs(flatten_sounds(sound_group)) do
 			if sound_data.Key == "sh" and ply == LocalPlayer() then
 				chatsounds.WebAudio.Panic()
 				continue
@@ -137,7 +152,7 @@ if CLIENT then
 
 			local sound_task = chatsounds.Tasks.new()
 			sound_task.Callback = function()
-				local modifiers = table.Merge(get_all_modifiers(sound_group), sound_data.Modifiers)
+				local modifiers = table.Merge(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
 				local stream = chatsounds.WebAudio.CreateStream("data/" .. _sound.Path)
 				local started = false
 
@@ -181,39 +196,15 @@ if CLIENT then
 			table.insert(sound_tasks, sound_task)
 		end
 
-		local function recursive_callback()
-			local grp_tasks = {}
-			for _, child_group in ipairs(sound_group.Children) do
-				PrintTable(child_group)
-
-				local child_task = chatsounds.Tasks.new()
-				child_task.Callback = function()
-					cs_player.PlaySoundGroupAsync(ply, child_group):next(function()
-						child_task:resolve()
-					end, function(err)
-						child_task:reject(err)
-					end)
-				end
-
-				table.insert(grp_tasks, child_task)
-			end
-
-			wait_all_tasks_in_order(grp_tasks)
-				:next(
-					function() finished_task:resolve() end,
-					function(err) finished_task:reject(err) end
-				)
-		end
-
 		wait_all_tasks_in_order(download_tasks):next(
 			function()
 				if #sound_tasks > 0 then
 					wait_all_tasks_in_order(sound_tasks):next(
-						recursive_callback,
+						function() finished_task:resolve() end,
 						function(err) finished_task:reject(err) end
 					)
 				else
-					recursive_callback()
+					finished_task:resolve()
 				end
 			end,
 			function(err) finished_task:reject(err) end

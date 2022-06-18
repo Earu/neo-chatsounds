@@ -15,13 +15,20 @@ for modifier_name, modifier in pairs(chatsounds.Modifiers) do
 	end
 end
 
-local function parse_sounds(ctx)
+local function parse_sounds(index, ctx)
 	if #ctx.CurrentStr == 0 then return end
 
 	local cur_scope = ctx.Scopes[#ctx.Scopes]
 	if chatsounds.Data.Lookup.List[ctx.CurrentStr] then
 		cur_scope.Sounds = cur_scope.Sounds or {}
-		table.insert(cur_scope.Sounds, { Key = ctx.CurrentStr, Modifiers = {}, Type = "sound" })
+		table.insert(cur_scope.Sounds, {
+			Key = ctx.CurrentStr,
+			Modifiers = {},
+			Type = "sound",
+			StartIndex = index,
+			EndIndex = index + #ctx.CurrentStr,
+			ParentScope = cur_scope,
+		})
 	else
 		local start_index = 1
 		while start_index <= #ctx.CurrentStr do
@@ -30,19 +37,27 @@ local function parse_sounds(ctx)
 			for i = 0, #ctx.CurrentStr do
 				chatsounds.Runners.Yield()
 
-				local index = #ctx.CurrentStr - i
-				if index < start_index then break end -- cant go lower than start index
+				local relative_index = #ctx.CurrentStr - i
+				if relative_index < start_index then break end -- cant go lower than start index
 
 				-- we only want to match with words so account for space chars and end of string
-				if ctx.CurrentStr[index] == " " or index == start_index then
-					index = index == start_index and #ctx.CurrentStr + 1 or index -- small hack for end of string
-					last_space_index = index
+				if ctx.CurrentStr[relative_index] == " " or relative_index == start_index then
+					relative_index = relative_index == start_index and #ctx.CurrentStr + 1 or relative_index -- small hack for end of string
+					last_space_index = relative_index
 
-					local str_chunk = ctx.CurrentStr:sub(start_index, index - 1):Trim() -- need to trim here, because the player can chain multiple spaces
+					local str_chunk = ctx.CurrentStr:sub(start_index, relative_index - 1):Trim() -- need to trim here, because the player can chain multiple spaces
 					if chatsounds.Data.Lookup.List[str_chunk] then
 						cur_scope.Sounds = cur_scope.Sounds or {}
-						table.insert(cur_scope.Sounds, { Key = str_chunk, Modifiers = {}, Type = "sound" })
-						start_index = index + 1
+						table.insert(cur_scope.Sounds, {
+							Key = str_chunk,
+							Modifiers = {},
+							Type = "sound",
+							StartIndex = index + start_index,
+							EndIndex = index + relative_index - 1,
+							ParentScope = cur_scope,
+						})
+
+						start_index = relative_index + 1
 						matched = true
 						break
 					end
@@ -75,7 +90,7 @@ local scope_handlers = {
 	["("] = function(raw_str, index, ctx)
 		if ctx.InLuaExpression then return end
 
-		parse_sounds(ctx)
+		parse_sounds(index, ctx)
 
 		local cur_scope = table.remove(ctx.Scopes, #ctx.Scopes)
 		cur_scope.StartIndex = index
@@ -83,7 +98,7 @@ local scope_handlers = {
 	[")"] = function(raw_str, index, ctx)
 		if ctx.InLuaExpression then return end
 
-		parse_sounds(ctx) -- will parse sounds and assign modifiers to said sounds if any
+		parse_sounds(index, ctx) -- will parse sounds and assign modifiers to said sounds if any
 
 		local parent_scope = ctx.Scopes[#ctx.Scopes]
 		local new_scope = {
@@ -119,7 +134,12 @@ local scope_handlers = {
 					for _, previous_modifier in ipairs(last_scope_child.Modifiers) do
 						table.insert(ctx.Modifiers, previous_modifier)
 					end
+
+					last_scope_child.Modifiers = nil -- clean that up
 				end
+
+				-- don't play the potential sounds in the modifier
+				last_scope_child.Sounds = {}
 
 				modifier = setmetatable({
 					Type = "modifier",
@@ -243,7 +263,7 @@ local function parse_str(raw_str)
 		end
 	end
 
-	parse_sounds(ctx)
+	parse_sounds(1, ctx)
 
 	return coroutine.yield(global_scope)
 end
