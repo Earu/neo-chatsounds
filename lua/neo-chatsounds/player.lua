@@ -300,12 +300,11 @@ if CLIENT then
 	local CONTEXT_SEPARATOR = ";"
 	function cs_player.PlayAsync(ply, text)
 		if text[1] == CONTEXT_SEPARATOR then return end
+
 		local tasks = {}
 		local text_chunks = text:Split(CONTEXT_SEPARATOR)
-
 		for _, chunk in ipairs(text_chunks) do
 			local t = chatsounds.Tasks.new()
-
 			chatsounds.Parser.ParseAsync(chunk):next(function(sound_group)
 				local ret = hook.Run("ChatsoundsShouldPlay", ply, chunk, sound_group)
 				if ret == false then
@@ -353,11 +352,14 @@ if CLIENT then
 
 		if not IsValid(ply) then return end
 
-		cs_player.PlayAsync(ply, text):next(nil, function(errors)
-			for _, err in ipairs(errors) do
-				chatsounds.Error(err)
-			end
-		end)
+		local t = cs_player.PlayAsync(ply, text)
+		if t then
+			t:next(nil, function(errors)
+				for _, err in ipairs(errors) do
+					chatsounds.Error(err)
+				end
+			end)
+		end
 	end)
 
 	-- this is necessary otherwise when using the first sounds with webaudio it just fails to play
