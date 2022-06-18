@@ -121,6 +121,7 @@ if CLIENT then
 	end
 
 	-- TODO: Flatten sound groups so that sounds are played in order even with sub groups
+	local last_panic = 0
 	function cs_player.PlaySoundGroupAsync(ply, sound_group)
 		local finished_task = chatsounds.Tasks.new()
 		if sound_group.Type ~= "group" then
@@ -132,11 +133,10 @@ if CLIENT then
 			local download_tasks = {}
 			local sound_tasks = {}
 			local sounds = flatten_sounds(sound_group)
-			local group_paniced = false
 			for _, sound_data in ipairs(sounds) do
 				if sound_data.Key == "sh" and ply == LocalPlayer() then
 					chatsounds.WebAudio.Panic()
-					group_paniced = true
+					last_panic = CurTime()
 					continue
 				end
 
@@ -168,8 +168,9 @@ if CLIENT then
 				end
 
 				local sound_task = chatsounds.Tasks.new()
+				sound_task.StartTime = CurTime()
 				sound_task.Callback = function()
-					if group_paniced then
+					if last_panic >= sound_task.StartTime then
 						sound_task:resolve()
 						return
 					end

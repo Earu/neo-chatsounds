@@ -15,7 +15,7 @@ for modifier_name, modifier in pairs(chatsounds.Modifiers) do
 	end
 end
 
-local function asign_modifiers(ctx, sounds)
+local function assign_modifiers(ctx, sounds)
 	if not sounds then return end
 
 	for i = 0, #sounds do
@@ -99,7 +99,7 @@ local function parse_sounds(index, ctx)
 		end
 	end
 
-	asign_modifiers(ctx, cur_scope.Sounds)
+	assign_modifiers(ctx, cur_scope.Sounds)
 
 	-- reset the current string and modifiers
 	ctx.CurrentStr = ""
