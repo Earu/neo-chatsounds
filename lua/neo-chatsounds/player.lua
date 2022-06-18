@@ -25,7 +25,7 @@ if CLIENT then
 
 	function cs_player.GetWantedSound(sound_data)
 		local matching_sounds = chatsounds.Data.Lookup.List[sound_data.Key]
-		local index = util.SharedRandom("chatsounds", 1, #matching_sounds, CurTime())
+		local index = math.Round(util.SharedRandom("chatsounds", 1, #matching_sounds, CurTime()))
 		local ret_a, ret_b = hook.Run("ChatsoundsOnSelection", index, matching_sounds)
 
 		if isnumber(ret_a) then
@@ -38,7 +38,15 @@ if CLIENT then
 
 		for _, modifier in ipairs(sound_data.Modifiers) do
 			if modifier.OnSelection then
-				index, matching_sounds = modifier:OnSelection(index, matching_sounds)
+				ret_a, ret_b = modifier:OnSelection(index, matching_sounds)
+
+				if isnumber(ret_a) then
+					index = ret_a
+				end
+
+				if istable(ret_b) then
+					matching_sounds = ret_b
+				end
 			end
 		end
 
@@ -163,7 +171,6 @@ if CLIENT then
 			local download_tasks = {}
 			local sound_tasks = {}
 			local sounds = flatten_sounds(sound_group)
-			PrintTable(sounds)
 			for _, sound_data in ipairs(sounds) do
 				if sound_data.Key == "sh" and ply == LocalPlayer() then
 					chatsounds.WebAudio.Panic()
@@ -201,6 +208,8 @@ if CLIENT then
 				local sound_task = chatsounds.Tasks.new()
 				sound_task.StartTime = CurTime()
 				sound_task.Callback = function()
+					print("wow")
+
 					if last_panic >= sound_task.StartTime then
 						sound_task:resolve()
 						return
