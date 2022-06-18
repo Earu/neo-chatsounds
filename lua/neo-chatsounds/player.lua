@@ -1,19 +1,14 @@
 if SERVER then
 	util.AddNetworkString("chatsounds")
 
-	net.Receive("chatsounds", function(_, ply)
-		local str = net.ReadString()
-		local ret = hook.Run("ChatsoundsShouldNetwork", ply, str)
+	hook.Add("PlayerSay", "chatsounds.Player", function(ply, text)
+		local ret = hook.Run("ChatsoundsShouldNetwork", ply, text)
 		if ret == false then return end
 
-		timer.Simple(0, function()
-			if not IsValid(ply) then return end -- can happen in theory
-
-			net.Start("chatsounds", true)
-				net.WriteEntity(ply)
-				net.WriteString(str:sub(1, 60000))
-			net.Broadcast()
-		end)
+		net.Start("chatsounds", true)
+			net.WriteEntity(ply)
+			net.WriteString(text:sub(1, 60000))
+		net.Broadcast()
 	end)
 end
 
@@ -297,8 +292,6 @@ if CLIENT then
 			net.WriteString(text:sub(1, 60000))
 		net.SendToServer()
 	end
-
-	hook.Add("OnPlayerChat", "chatsounds.Player", handler)
 
 	concommand.Add("saysound", function(ply, _, _, str)
 		handler(ply, str)
