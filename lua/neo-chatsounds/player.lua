@@ -113,12 +113,18 @@ if CLIENT then
 	local function sound_pre_process(grp, is_group)
 		if not grp.Modifiers then return DEFAULT_OPTS end
 
+		local opts = table.Copy(DEFAULT_OPTS)
 		for _, modifier in ipairs(grp.Modifiers) do
 			chatsounds.Runners.Yield()
-			if is_group and modifier.OnGroupPreProcess then
-				return modifier:OnGroupPreProcess(grp) or DEFAULT_OPTS
-			elseif not is_group and modifier.OnSoundPreProcess then
-				return modifier:OnSoundPreProcess(grp) or DEFAULT_OPTS
+			if is_group then
+				if modifier.OnGroupPreProcess then
+					return modifier:OnGroupPreProcess(grp, opts) or DEFAULT_OPTS
+				end
+			else
+				if modifier.OnSoundPreProcess then
+					local ret = modifier:OnSoundPreProcess(grp, opts) or DEFAULT_OPTS
+					return ret
+				end
 			end
 		end
 
@@ -136,7 +142,7 @@ if CLIENT then
 				for _, sound_data in ipairs(sound_group.Sounds) do
 					chatsounds.Runners.Yield()
 
-					local snd_opts = sound_pre_process(sound_group, false)
+					local snd_opts = sound_pre_process(sound_data, false)
 					local snd_iters = snd_opts.DuplicateCount or 1
 					sound_data.Modifiers = table.Merge(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
 					for _ = 1, snd_iters do
@@ -208,8 +214,6 @@ if CLIENT then
 				local sound_task = chatsounds.Tasks.new()
 				sound_task.StartTime = CurTime()
 				sound_task.Callback = function()
-					print("wow")
-
 					if last_panic >= sound_task.StartTime then
 						sound_task:resolve()
 						return
