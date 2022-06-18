@@ -26,12 +26,17 @@ function runners.Execute(fn, ...)
 	return t
 end
 
+local CS_RUNNER_INTERVAL = CreateConVar(
+	"chatsounds_runner_interval", "250", FCVAR_ARCHIVE,
+	"The interval in iterations between each runner yield, can lower or increase perfs",
+	10, 999999
+)
+
 local iter = 0
-local DEFAULT_MAX_ITERS = 250
 function runners.Yield(max_iters)
 	if not coroutine.running() then return end
 
-	if iter >= (max_iters or DEFAULT_MAX_ITERS) then
+	if iter >= (max_iters or CS_RUNNER_INTERVAL:GetInt()) then
 		coroutine.yield()
 		iter = 0
 	else
