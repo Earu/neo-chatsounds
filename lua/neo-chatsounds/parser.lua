@@ -182,22 +182,14 @@ local scope_handlers = {
 }
 
 local function parse_legacy_modifiers(ctx, char)
-	-- legacy modifiers are 2 chars max, so what we can do is check the current char and the previous
-	-- to match against the lookup table
-
 	local found_modifier
-	local modifier_start_index = 0
-	local used_current_char = true
-	if modifier_lookup[char] then
-		found_modifier = modifier_lookup[char]
-		modifier_start_index = 0
-	elseif modifier_lookup[char .. ctx.CurrentStr[1]] then
-		found_modifier = modifier_lookup[char .. ctx.CurrentStr[1]]
-		modifier_start_index = 1
+	local arg_start_index = 1
+	if modifier_lookup[ctx.CurrentStr:sub(1, 2)] then
+		found_modifier = modifier_lookup[ctx.CurrentStr:sub(1, 2)]
+		arg_start_index = 3
 	elseif modifier_lookup[ctx.CurrentStr[1]] then
 		found_modifier = modifier_lookup[ctx.CurrentStr[1]]
-		modifier_start_index = 1
-		used_current_char = false
+		arg_start_index = 2
 	end
 
 	if found_modifier then
@@ -208,21 +200,18 @@ local function parse_legacy_modifiers(ctx, char)
 		end
 
 		modifier = setmetatable(modifier, { __index = found_modifier })
-		modifier.Value = modifier:ParseArgs(ctx.CurrentStr:sub(modifier_start_index + 1, args_end_index))
+		modifier.Value = modifier:ParseArgs(arg_start_index, args_end_index)
 
 		table.insert(ctx.Modifiers, 1, modifier)
 		ctx.CurrentStr = args_end_index and ctx.CurrentStr:sub(ctx.LastCurrentStrSpaceIndex + 1) or ""
 		ctx.LastCurrentStrSpaceIndex = -1
-
-		return true, used_current_char
 	end
-
-	return false
 end
 
 local function parse_str(raw_str)
 	local global_scope = { -- global parent scope for the string
 		Children = {},
+		Sounds = {},
 		Parent = nil,
 		StartIndex = 1,
 		EndIndex = #raw_str,
@@ -247,19 +236,12 @@ local function parse_str(raw_str)
 		if scope_handlers[char] then
 			scope_handlers[char](raw_str, index, ctx)
 		else
-			local standard_iteration = true
-			-- check every even index so that we match pairs of chars, ideal for legacy modifiers that are 2 chars max in length and overlap
-			if i % 2 == 0 or i == #raw_str then
-				local _, used_current_char = parse_legacy_modifiers(ctx, char)
-				standard_iteration = not used_current_char
+			ctx.CurrentStr = char .. ctx.CurrentStr
+			if char == " " then
+				ctx.LastCurrentStrSpaceIndex = index
 			end
 
-			if standard_iteration then
-				ctx.CurrentStr = char .. ctx.CurrentStr
-				if char == " " then
-					ctx.LastCurrentStrSpaceIndex = index
-				end
-			end
+			parse_legacy_modifiers(ctx, char)
 		end
 	end
 
