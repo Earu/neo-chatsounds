@@ -33,7 +33,10 @@ do
 	AddCSLuaFile("neo-chatsounds/dependencies/tasks.lua")
 	AddCSLuaFile("neo-chatsounds/dependencies/json.lua")
 
-	chatsounds.WebAudio = include("neo-chatsounds/dependencies/webaudio.lua")
+	if CLIENT then
+		chatsounds.WebAudio = include("neo-chatsounds/dependencies/webaudio.lua")
+	end
+
 	chatsounds.Tasks = include("neo-chatsounds/dependencies/tasks.lua")
 	chatsounds.Json = include("neo-chatsounds/dependencies/json.lua")
 end

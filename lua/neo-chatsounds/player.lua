@@ -281,4 +281,9 @@ if CLIENT then
 			end
 		end)
 	end)
+
+	-- this is necessary otherwise when using the first sounds with webaudio it just fails to play
+	hook.Add("Initialize", "chatsounds.Player.WebAudio", function()
+		chatsounds.WebAudio.Initialize()
+	end)
 end
