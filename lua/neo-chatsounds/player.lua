@@ -224,7 +224,7 @@ if CLIENT then
 				end,
 				function(err) finished_task:reject(err) end
 			)
-		end)
+		end, function(err) finished_task:reject(err) end)
 
 		return finished_task
 	end
