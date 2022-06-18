@@ -191,7 +191,6 @@ if CLIENT then
 								sound_task:resolve()
 							end)
 
-							stream:UpdateVolume()
 							stream:Play()
 							started = true
 							hook.Run("ChatsoundsSoundInit", ply, _sound, stream, sound_data)
