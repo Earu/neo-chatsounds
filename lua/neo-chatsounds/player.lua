@@ -96,14 +96,38 @@ if CLIENT then
 		return ret
 	end
 
+	local function sound_pre_process(grp, is_group)
+		for _, modifier in ipais(grp.Modifiers) do
+			chatsounds.Runners.Yield()
+			if is_group and modifier.OnGroupPreProcess then
+				return modifier:OnGroupPreProcess(grp)
+			elseif not is_group and modifier.OnSoundPreProcess then
+				return modifier:OnSoundPreProcess(grp)
+			end
+		end
+
+		return {
+			DuplicateCount = 1,
+		}
+	end
+
 	local function flatten_sounds(sound_group, ret)
 		ret = ret or {}
 
 		if sound_group.Sounds then
-			for _, sound_data in ipairs(sound_group.Sounds) do
-				chatsounds.Runners.Yield()
-				sound_data.Modifiers = table.Merge(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
-				table.insert(ret, sound_data)
+			local opts = sound_pre_process(sound_group, true)
+			local iters = opts.DuplicateCount
+			for _ = 1, iters do
+				for _, sound_data in ipairs(sound_group.Sounds) do
+					chatsounds.Runners.Yield()
+
+					local opts = sound_pre_process(sound_group, false)
+					local snd_iters = opts.DuplicateCount
+					sound_data.Modifiers = table.Merge(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
+					for _ = 1, snd_iters do
+						table.insert(ret, sound_data)
+					end
+				end
 			end
 		end
 

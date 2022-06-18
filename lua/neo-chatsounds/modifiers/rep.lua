@@ -11,4 +11,16 @@ function MODIFIER:ParseArgs(args)
 	return math.max(1, rep)
 end
 
+function MODIFIER:OnGroupPreProcess(grp)
+	return {
+		DuplicateCount = self.Value
+	}
+end
+
+function MODIFIER:OnSoundPreProcess(snd)
+	return {
+		DuplicateCount = self.Value
+	}
+end
+
 return MODIFIER
