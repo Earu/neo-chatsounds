@@ -158,7 +158,6 @@ if CLIENT then
 		end
 
 		table.sort(ret, function(a, b)
-			chatsounds.Runners.Yield()
 			return a.StartIndex < b.StartIndex
 		end)
 
@@ -168,14 +167,10 @@ if CLIENT then
 	local function prepare_stream(snd, task)
 		local stream = chatsounds.WebAudio.CreateStream("data/" .. snd.Path)
 
-		--PrintTable(snd)
-		--print(stream)
-
 		timer.Simple(2, function()
 			if not stream:IsReady() then
 				hook.Remove("Think", stream)
 				task:reject(("Failed to stream %s"):format(snd.Url))
-				return
 			end
 		end)
 
@@ -217,6 +212,7 @@ if CLIENT then
 
 				local download_task = chatsounds.Tasks.new()
 				table.insert(download_tasks, download_task)
+
 				if not file.Exists(_sound.Path, "DATA") then
 					chatsounds.Log(("Downloading %s"):format(_sound.Url))
 					chatsounds.Http.Get(_sound.Url):next(function(res)
@@ -246,8 +242,6 @@ if CLIENT then
 
 					local started = false
 					hook.Add("Think", stream, function()
-						if not stream:IsReady() then return end
-
 						if not started then
 							stream:SetSourceEntity(ply)
 							stream:Set3D(true)
