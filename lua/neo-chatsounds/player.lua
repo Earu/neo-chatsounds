@@ -11,8 +11,8 @@ if SERVER then
 
 			net.Start("chatsounds", true)
 				net.WriteEntity(ply)
-				net.WriteString(str)
-			net.SendPVS(ply:GetPos())
+				net.WriteString(str:sub(1, 60000))
+			net.Broadcast()
 		end)
 	end)
 end
@@ -262,8 +262,10 @@ if CLIENT then
 	end
 
 	local function handler(ply, text)
+		if ply ~= LocalPlayer() then return end
+
 		net.Start("chatsounds", true)
-			net.WriteString(text)
+			net.WriteString(text:sub(1, 60000))
 		net.SendToServer()
 	end
 
