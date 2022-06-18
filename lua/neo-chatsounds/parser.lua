@@ -1,5 +1,12 @@
 local parser = chatsounds.Module("Parser")
 
+local SPACE_CHARS = {
+	["\t"] = true,
+	["\n"] = true,
+	["\r"] = true,
+	[" "] = true,
+}
+
 local modifier_lookup = {}
 for modifier_name, modifier in pairs(chatsounds.Modifiers) do
 	if not modifier.OnlyLegacy then
@@ -64,7 +71,7 @@ local function parse_sounds(index, ctx)
 				if relative_index < start_index then break end -- cant go lower than start index
 
 				-- we only want to match with words so account for space chars and end of string
-				if ctx.CurrentStr[relative_index] == " " or i == 0 then
+				if SPACE_CHARS[ctx.CurrentStr[relative_index]] or i == 0 then
 					last_space_index = relative_index
 
 					local str_chunk = ctx.CurrentStr:sub(start_index, relative_index):gsub("[\"\']", ""):Trim() -- need to trim here, because the player can chain multiple spaces
@@ -217,7 +224,7 @@ local function parse_legacy_modifiers(ctx, index)
 
 	if found_modifier then
 		local modifier = { Type = "modifier", Name = found_modifier.Name, StartIndex = index }
-		local space_index = ctx.CurrentStr:find(" ", 1)
+		local space_index = ctx.CurrentStr:find("[\t\n\r%s]", 1)
 
 		modifier = setmetatable(modifier, { __index = found_modifier })
 		modifier.Value = modifier:ParseArgs(ctx.CurrentStr:sub(args_start_index, space_index and space_index - 1 or nil))
@@ -261,7 +268,7 @@ local function parse_str(raw_str)
 			scope_handlers[char](raw_str, index, ctx)
 		else
 			ctx.CurrentStr = char .. ctx.CurrentStr
-			if char == " " then
+			if SPACE_CHARS[char] then
 				ctx.LastCurrentStrSpaceIndex = index
 			end
 
