@@ -238,6 +238,10 @@ local function parse_str(raw_str)
 		Root = true,
 	}
 
+	if #raw_str:Trim() == 0 then
+		return coroutine.yield(global_scope)
+	end
+
 	local ctx = {
 		Scopes = { global_scope },
 		InLuaExpression = false,
