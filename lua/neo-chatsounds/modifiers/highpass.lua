@@ -11,8 +11,8 @@ function MODIFIER:ParseArgs(args)
 end
 
 function MODIFIER:OnStreamInit(stream)
-	stram:SetFilterType(2)
-	stram:SetFilterFraction(self.Value)
+	stream:SetFilterType(2)
+	stream:SetFilterFraction(self.Value)
 end
 
 return MODIFIER
