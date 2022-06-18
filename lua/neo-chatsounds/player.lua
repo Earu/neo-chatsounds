@@ -81,29 +81,42 @@ if CLIENT then
 	local function get_all_modifiers(sound_group, ret)
 		ret = ret or {}
 
-		for _, modifier in ipairs(sound_group.Modifiers or {}) do
-			table.insert(ret, modifier)
+		if sound_group.Modifiers then
+			for _, modifier in ipairs(sound_group.Modifiers) do
+				chatsounds.Runners.Yield()
+				table.insert(ret, modifier)
+			end
 		end
 
 		if sound_group.Parent then
+			chatsounds.Runners.Yield()
 			get_all_modifiers(sound_group.Parent, ret)
 		end
 
 		return ret
 	end
 
-	local function flatten_sounds(root, ret)
+	local function flatten_sounds(sound_group, ret)
 		ret = ret or {}
 
-		for _, sound_data in ipairs(root.Sounds) do
-			table.insert(ret, sound_data)
+		if sound_group.Sounds then
+			for _, sound_data in ipairs(sound_group.Sounds) do
+				chatsounds.Runners.Yield()
+				sound_data.Modifiers = table.Merge(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
+				table.insert(ret, sound_data)
+			end
 		end
 
-		for _, sound_group in ipairs(root.Children) do
+		for _, sound_group in ipairs(sound_group.Children) do
+			chatsounds.Runners.Yield()
 			flatten_sounds(sound_group, ret)
 		end
 
-		table.sort(ret, function(a, b) return a.StartIndex < b.StartIndex end)
+		table.sort(ret, function(a, b)
+			chatsounds.Runners.Yield()
+			return a.StartIndex < b.StartIndex
+		end)
+
 		return ret
 	end
 
@@ -115,100 +128,103 @@ if CLIENT then
 			return finished_task
 		end
 
-		local download_tasks = {}
-		local sound_tasks = {}
-		for _, sound_data in ipairs(flatten_sounds(sound_group)) do
-			if sound_data.Key == "sh" and ply == LocalPlayer() then
-				chatsounds.WebAudio.Panic()
-				continue
-			end
+		chatsounds.Runners.Execute(function()
+			local download_tasks = {}
+			local sound_tasks = {}
+			local sounds = flatten_sounds(sound_group)
+			PrintTable(sounds)
 
-			local _sound = cs_player.GetWantedSound(sound_data)
-			local sound_dir_path = _sound.Path:GetPathFromFilename()
-
-			if not file.Exists(sound_dir_path, "DATA") then
-				file.CreateDir(sound_dir_path)
-			end
-
-			if not file.Exists(_sound.Path, "DATA") then
-				chatsounds.Log(("Downloading %s"):format(_sound.Url))
-
-				local download_task = chatsounds.Tasks.new()
-				table.insert(download_tasks, download_task)
-
-				chatsounds.Http.Get(_sound.Url):next(function(res)
-					if res.Status ~= 200 then
-						download_task:reject(("Failed to download %s: %d"):format(_sound.Url, res.Status))
-						return
-					end
-
-					file.Write(_sound.Path, res.Body)
-					chatsounds.Log(("Downloaded %s"):format(_sound.Url))
-					download_task:resolve()
-				end, function(err)
-					download_task:reject(err)
-				end)
-			end
-
-			local sound_task = chatsounds.Tasks.new()
-			sound_task.Callback = function()
-				local modifiers = table.Merge(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
-				local stream = chatsounds.WebAudio.CreateStream("data/" .. _sound.Path)
-				local started = false
-
-				hook.Add("Think", stream, function()
-					if not stream:IsReady() then return end
-
-					if not started then
-						stream:SetSourceEntity(ply)
-						stream:Set3D(true)
-						stream.Duration = stream:GetLength()
-
-						for _, modifier in ipairs(modifiers) do
-							if modifier.OnStreamInit then
-								modifier:OnStreamInit(stream)
-							end
-						end
-
-						timer.Simple(stream.Duration, function()
-							if IsValid(stream) then
-								stream:Remove()
-							end
-
-							sound_task:resolve()
-						end)
-
-						stream:Play()
-						started = true
-						hook.Run("ChatsoundsSoundInit", ply, _sound, stream, sound_data)
-					end
-
-					for _, modifier in ipairs(modifiers) do
-						if modifier.OnStreamThink then
-							modifier:OnStreamThink(stream)
-						end
-					end
-
-					hook.Run("ChatsoundsSoundThink", ply, _sound, stream, sound_data)
-				end)
-			end
-
-			table.insert(sound_tasks, sound_task)
-		end
-
-		wait_all_tasks_in_order(download_tasks):next(
-			function()
-				if #sound_tasks > 0 then
-					wait_all_tasks_in_order(sound_tasks):next(
-						function() finished_task:resolve() end,
-						function(err) finished_task:reject(err) end
-					)
-				else
-					finished_task:resolve()
+			for _, sound_data in ipairs(sounds) do
+				if sound_data.Key == "sh" and ply == LocalPlayer() then
+					chatsounds.WebAudio.Panic()
+					continue
 				end
-			end,
-			function(err) finished_task:reject(err) end
-		)
+
+				local _sound = cs_player.GetWantedSound(sound_data)
+				local sound_dir_path = _sound.Path:GetPathFromFilename()
+
+				if not file.Exists(sound_dir_path, "DATA") then
+					file.CreateDir(sound_dir_path)
+				end
+
+				if not file.Exists(_sound.Path, "DATA") then
+					chatsounds.Log(("Downloading %s"):format(_sound.Url))
+
+					local download_task = chatsounds.Tasks.new()
+					table.insert(download_tasks, download_task)
+
+					chatsounds.Http.Get(_sound.Url):next(function(res)
+						if res.Status ~= 200 then
+							download_task:reject(("Failed to download %s: %d"):format(_sound.Url, res.Status))
+							return
+						end
+
+						file.Write(_sound.Path, res.Body)
+						chatsounds.Log(("Downloaded %s"):format(_sound.Url))
+						download_task:resolve()
+					end, function(err)
+						download_task:reject(err)
+					end)
+				end
+
+				local sound_task = chatsounds.Tasks.new()
+				sound_task.Callback = function()
+					local stream = chatsounds.WebAudio.CreateStream("data/" .. _sound.Path)
+					local started = false
+					hook.Add("Think", stream, function()
+						if not stream:IsReady() then return end
+
+						if not started then
+							stream:SetSourceEntity(ply)
+							stream:Set3D(true)
+							stream.Duration = stream:GetLength()
+
+							for _, modifier in ipairs(sound_data.Modifiers) do
+								if modifier.OnStreamInit then
+									modifier:OnStreamInit(stream)
+								end
+							end
+
+							timer.Simple(stream.Duration, function()
+								if IsValid(stream) then
+									stream:Remove()
+								end
+
+								sound_task:resolve()
+							end)
+
+							stream:Play()
+							started = true
+							hook.Run("ChatsoundsSoundInit", ply, _sound, stream, sound_data)
+						end
+
+						for _, modifier in ipairs(sound_data.Modifiers) do
+							if modifier.OnStreamThink then
+								modifier:OnStreamThink(stream)
+							end
+						end
+
+						hook.Run("ChatsoundsSoundThink", ply, _sound, stream, sound_data)
+					end)
+				end
+
+				table.insert(sound_tasks, sound_task)
+			end
+
+			wait_all_tasks_in_order(download_tasks):next(
+				function()
+					if #sound_tasks > 0 then
+						wait_all_tasks_in_order(sound_tasks):next(
+							function() finished_task:resolve() end,
+							function(err) finished_task:reject(err) end
+						)
+					else
+						finished_task:resolve()
+					end
+				end,
+				function(err) finished_task:reject(err) end
+			)
+		end)
 
 		return finished_task
 	end
