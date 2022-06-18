@@ -107,7 +107,7 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 			end
 
 			for i, file_data in pairs(resp.tree) do
-				chatsounds.Runners.Yield(250)
+				chatsounds.Runners.Yield()
 
 				update_loading_state()
 
@@ -164,7 +164,7 @@ local function merge_repos()
 				end
 
 				for _, sound_data in pairs(sound_list) do
-					chatsounds.Runners.Yield(250)
+					chatsounds.Runners.Yield()
 					table.insert(lookup.List[sound_key], sound_data)
 					update_loading_state()
 				end
@@ -173,7 +173,7 @@ local function merge_repos()
 					local key_chunks = sound_key:Split(" ")
 					local cur_tree_node = lookup.Tree
 					for i, chunk in pairs(key_chunks) do
-						chatsounds.Runners.Yield(250)
+						chatsounds.Runners.Yield()
 
 						if not words[chunk] then
 							words[chunk] = {}
@@ -346,7 +346,7 @@ if CLIENT then
 
 	local completion_sepatator = "=================="
 	function data.BuildCompletionSuggestions(text)
-		text = text:gsub("[%s\n\r\t]+"," ")
+		text = text:gsub("[%s\n\r\t]+"," "):gsub("[\"\']", "")
 
 		if #text == 0 then
 			data.Suggestions = {}

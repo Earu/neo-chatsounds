@@ -27,7 +27,7 @@ function runners.Execute(fn, ...)
 end
 
 local iter = 0
-local DEFAULT_MAX_ITERS = 25
+local DEFAULT_MAX_ITERS = 250
 function runners.Yield(max_iters)
 	if not coroutine.running() then return end
 
