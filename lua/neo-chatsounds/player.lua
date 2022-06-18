@@ -1,14 +1,22 @@
 if SERVER then
 	util.AddNetworkString("chatsounds")
+	util.AddNetworkString("chatsounds_cmd")
 
-	hook.Add("PlayerSay", "chatsounds.Player", function(ply, text)
+	local function handler(ply, text)
 		local ret = hook.Run("ChatsoundsShouldNetwork", ply, text)
 		if ret == false then return end
 
-		net.Start("chatsounds", true)
+		net.Start("chatsounds")
 			net.WriteEntity(ply)
 			net.WriteString(text:sub(1, 60000))
 		net.Broadcast()
+	end
+
+	hook.Add("PlayerSay", "chatsounds.Player", handler)
+
+	net.Receive("chatsounds_cmd", function(_, ply)
+		local text = net.ReadString()
+		handler(ply, text)
 	end)
 end
 
@@ -91,33 +99,35 @@ if CLIENT then
 		return ret
 	end
 
+	local DEFAULT_OPTS = {
+		DuplicateCount = 1,
+	}
 	local function sound_pre_process(grp, is_group)
 		for _, modifier in ipais(grp.Modifiers) do
 			chatsounds.Runners.Yield()
 			if is_group and modifier.OnGroupPreProcess then
-				return modifier:OnGroupPreProcess(grp)
+				return modifier:OnGroupPreProcess(grp) or DEFAULT_OPTS
 			elseif not is_group and modifier.OnSoundPreProcess then
-				return modifier:OnSoundPreProcess(grp)
+				return modifier:OnSoundPreProcess(grp) or DEFAULT_OPTS
 			end
 		end
 
-		return {
-			DuplicateCount = 1,
-		}
+		return DEFAULT_OPTS
 	end
+
 
 	local function flatten_sounds(sound_group, ret)
 		ret = ret or {}
 
 		if sound_group.Sounds then
-			local opts = sound_pre_process(sound_group, true)
-			local iters = opts.DuplicateCount
+			local opts = sound_pre_process(sound_group, true) or {}
+			local iters = opts.DuplicateCount or 1
 			for _ = 1, iters do
 				for _, sound_data in ipairs(sound_group.Sounds) do
 					chatsounds.Runners.Yield()
 
 					local opts = sound_pre_process(sound_group, false)
-					local snd_iters = opts.DuplicateCount
+					local snd_iters = opts.DuplicateCount or 1
 					sound_data.Modifiers = table.Merge(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
 					for _ = 1, snd_iters do
 						table.insert(ret, sound_data)
@@ -139,7 +149,6 @@ if CLIENT then
 		return ret
 	end
 
-	-- TODO: Flatten sound groups so that sounds are played in order even with sub groups
 	local last_panic = 0
 	function cs_player.PlaySoundGroupAsync(ply, sound_group)
 		local finished_task = chatsounds.Tasks.new()
@@ -288,7 +297,7 @@ if CLIENT then
 	local function handler(ply, text)
 		if ply ~= LocalPlayer() then return end
 
-		net.Start("chatsounds", true)
+		net.Start("chatsounds_cmd")
 			net.WriteString(text:sub(1, 60000))
 		net.SendToServer()
 	end
