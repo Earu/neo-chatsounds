@@ -107,9 +107,9 @@ if CLIENT then
 			end
 		end
 
-		for _, sound_group in ipairs(sound_group.Children) do
+		for _, child_group in ipairs(sound_group.Children) do
 			chatsounds.Runners.Yield()
-			flatten_sounds(sound_group, ret)
+			flatten_sounds(child_group, ret)
 		end
 
 		table.sort(ret, function(a, b)
@@ -132,8 +132,6 @@ if CLIENT then
 			local download_tasks = {}
 			local sound_tasks = {}
 			local sounds = flatten_sounds(sound_group)
-			PrintTable(sounds)
-
 			for _, sound_data in ipairs(sounds) do
 				if sound_data.Key == "sh" and ply == LocalPlayer() then
 					chatsounds.WebAudio.Panic()
