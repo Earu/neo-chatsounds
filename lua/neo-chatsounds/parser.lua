@@ -200,7 +200,7 @@ local function parse_legacy_modifiers(ctx, char)
 		end
 
 		modifier = setmetatable(modifier, { __index = found_modifier })
-		modifier.Value = modifier:ParseArgs(arg_start_index, args_end_index)
+		modifier.Value = modifier:ParseArgs(ctx.CurrentStr:sub(arg_start_index, args_end_index))
 
 		table.insert(ctx.Modifiers, 1, modifier)
 		ctx.CurrentStr = args_end_index and ctx.CurrentStr:sub(ctx.LastCurrentStrSpaceIndex + 1) or ""
