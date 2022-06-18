@@ -397,7 +397,7 @@ if CLIENT then
 		end
 
 		table.sort(suggestions, function(a, b)
-			return a:len() < b:len()
+			return a:byte() < b:byte()
 		end)
 
 		completion_sepatator = ("="):rep((suggestions[#suggestions] or "=================="):len() + 5)

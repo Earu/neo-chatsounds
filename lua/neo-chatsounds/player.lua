@@ -132,9 +132,11 @@ if CLIENT then
 			local download_tasks = {}
 			local sound_tasks = {}
 			local sounds = flatten_sounds(sound_group)
+			local group_paniced = false
 			for _, sound_data in ipairs(sounds) do
 				if sound_data.Key == "sh" and ply == LocalPlayer() then
 					chatsounds.WebAudio.Panic()
+					group_paniced = true
 					continue
 				end
 
@@ -167,6 +169,11 @@ if CLIENT then
 
 				local sound_task = chatsounds.Tasks.new()
 				sound_task.Callback = function()
+					if group_paniced then
+						sound_task:resolve()
+						return
+					end
+
 					local stream = chatsounds.WebAudio.CreateStream("data/" .. _sound.Path)
 					local started = false
 					hook.Add("Think", stream, function()
@@ -276,7 +283,10 @@ if CLIENT then
 		handler(ply, str)
 	end)
 
+	local CS_ENABLE = CreateConVar("chatsounds_enable", "1", FCVAR_ARCHIVE, "Enables/disables chatsounds", 0, 1)
 	net.Receive("chatsounds", function()
+		if not CS_ENABLE:GetBool() then return end
+
 		local ply = net.ReadEntity()
 		local text = net.ReadString()
 
