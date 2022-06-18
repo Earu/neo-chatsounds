@@ -77,7 +77,7 @@ if CLIENT then
 			end)
 
 			if task.Callback then
-				local succ, err = pcall(task.Callback, task)
+				local succ, err = pcall(task.Callback, task, i)
 				if not succ then
 					finished_task:reject(err)
 					return
@@ -165,7 +165,30 @@ if CLIENT then
 		return ret
 	end
 
-	local last_panic = 0
+	local function prepare_stream(snd, task)
+		local stream = chatsounds.WebAudio.CreateStream("data/" .. snd.Path)
+
+		--PrintTable(snd)
+		--print(stream)
+
+		timer.Simple(2, function()
+			if not stream:IsReady() then
+				hook.Remove("Think", stream)
+				task:reject(("Failed to stream %s"):format(snd.Url))
+				return
+			end
+		end)
+
+		hook.Add("Think", stream, function()
+			if not stream:IsReady() then return end
+
+			hook.Remove("Think", stream)
+			task:resolve()
+		end)
+
+		return stream
+	end
+
 	function cs_player.PlaySoundGroupAsync(ply, sound_group)
 		local finished_task = chatsounds.Tasks.new()
 		if sound_group.Type ~= "group" then
@@ -177,10 +200,11 @@ if CLIENT then
 			local download_tasks = {}
 			local sound_tasks = {}
 			local sounds = flatten_sounds(sound_group)
-			for _, sound_data in ipairs(sounds) do
+			local streams = {}
+			for i, sound_data in ipairs(sounds) do
 				if sound_data.Key == "sh" and ply == LocalPlayer() then
 					chatsounds.WebAudio.Panic()
-					last_panic = CurTime()
+					streams = {}
 					continue
 				end
 
@@ -191,12 +215,10 @@ if CLIENT then
 					file.CreateDir(sound_dir_path)
 				end
 
+				local download_task = chatsounds.Tasks.new()
+				table.insert(download_tasks, download_task)
 				if not file.Exists(_sound.Path, "DATA") then
 					chatsounds.Log(("Downloading %s"):format(_sound.Url))
-
-					local download_task = chatsounds.Tasks.new()
-					table.insert(download_tasks, download_task)
-
 					chatsounds.Http.Get(_sound.Url):next(function(res)
 						if res.Status ~= 200 then
 							download_task:reject(("Failed to download %s: %d"):format(_sound.Url, res.Status))
@@ -205,21 +227,23 @@ if CLIENT then
 
 						file.Write(_sound.Path, res.Body)
 						chatsounds.Log(("Downloaded %s"):format(_sound.Url))
-						download_task:resolve()
+						streams[i] = prepare_stream(_sound, download_task)
 					end, function(err)
 						download_task:reject(err)
 					end)
+				else
+					streams[i] = prepare_stream(_sound, download_task)
 				end
 
 				local sound_task = chatsounds.Tasks.new()
 				sound_task.StartTime = CurTime()
-				sound_task.Callback = function()
-					if last_panic >= sound_task.StartTime then
+				sound_task.Callback = function(_, i)
+					local stream = streams[i]
+					if not stream then
 						sound_task:resolve()
 						return
 					end
 
-					local stream = chatsounds.WebAudio.CreateStream("data/" .. _sound.Path)
 					local started = false
 					hook.Add("Think", stream, function()
 						if not stream:IsReady() then return end
