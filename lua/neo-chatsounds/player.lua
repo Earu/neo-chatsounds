@@ -103,7 +103,9 @@ if CLIENT then
 		DuplicateCount = 1,
 	}
 	local function sound_pre_process(grp, is_group)
-		for _, modifier in ipais(grp.Modifiers) do
+		if not grp.Modifiers then return DEFAULT_OPTS end
+
+		for _, modifier in ipairs(grp.Modifiers) do
 			chatsounds.Runners.Yield()
 			if is_group and modifier.OnGroupPreProcess then
 				return modifier:OnGroupPreProcess(grp) or DEFAULT_OPTS
@@ -120,14 +122,14 @@ if CLIENT then
 		ret = ret or {}
 
 		if sound_group.Sounds then
-			local opts = sound_pre_process(sound_group, true) or {}
+			local opts = sound_pre_process(sound_group, true)
 			local iters = opts.DuplicateCount or 1
 			for _ = 1, iters do
 				for _, sound_data in ipairs(sound_group.Sounds) do
 					chatsounds.Runners.Yield()
 
-					local opts = sound_pre_process(sound_group, false)
-					local snd_iters = opts.DuplicateCount or 1
+					local snd_opts = sound_pre_process(sound_group, false)
+					local snd_iters = snd_opts.DuplicateCount or 1
 					sound_data.Modifiers = table.Merge(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
 					for _ = 1, snd_iters do
 						table.insert(ret, sound_data)
@@ -161,6 +163,7 @@ if CLIENT then
 			local download_tasks = {}
 			local sound_tasks = {}
 			local sounds = flatten_sounds(sound_group)
+			PrintTable(sounds)
 			for _, sound_data in ipairs(sounds) do
 				if sound_data.Key == "sh" and ply == LocalPlayer() then
 					chatsounds.WebAudio.Panic()
