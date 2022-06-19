@@ -31,6 +31,8 @@ local function assign_modifiers(ctx, sounds)
 
 			local index = #sounds - i
 			local modifier = ctx.Modifiers[1]
+			if not modifier then break end
+
 			local sound_data = sounds[index]
 			if not sound_data then continue end
 
