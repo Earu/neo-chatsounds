@@ -17,7 +17,7 @@ You have multiple options here:
 2) Type various things in the chat and scroll through the suggestions made.
 
 ## How do I add sounds?
-Typically you can either add sounds in [this repo](https://github.com/PAC3-Server/chatsounds-valve-games) or in [this one](https://github.com/PAC3-Server/chatsounds). Each of them are maintained by different people but the rules for adding a sound are the same.
+Typically you can either add sounds in [this repo](https://github.com/Metastruct/garrysmod-chatsounds) or in [this one](https://github.com/PAC3-Server/chatsounds). Each of them are maintained by different people but the rules for adding a sound are the same.
 
 **`Do check their readme.md!`**
 
