@@ -24,8 +24,10 @@ if CLIENT then
 	local cs_player = chatsounds.Module("Player")
 
 	function cs_player.GetWantedSound(sound_data)
+		math.randomseed(math.Round(CurTime()))
+
 		local matching_sounds = chatsounds.Data.Lookup.List[sound_data.Key]
-		local index = math.Round(util.SharedRandom("chatsounds", 1, #matching_sounds, CurTime()))
+		local index = math.random(1, #matching_sounds)
 		local ret_a, ret_b = hook.Run("ChatsoundsOnSelection", index, matching_sounds)
 
 		if isnumber(ret_a) then
