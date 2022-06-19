@@ -184,6 +184,7 @@ local scope_handlers = {
 					StartIndex = index,
 					EndIndex = last_scope_child.EndIndex,
 					Scope = last_scope_child,
+					IsLegacy = false,
 				}, { __index = modifier_lookup[modifier_name] })
 
 				if last_scope_child.ExpressionFn then
@@ -200,6 +201,7 @@ local scope_handlers = {
 					StartIndex = index,
 					EndIndex = index + #modifier_name,
 					Value = modifier_lookup[modifier_name].DefaultValue,
+					IsLegacy = false,
 				}, { __index = modifier_lookup[modifier_name] })
 			end
 		end
@@ -242,6 +244,7 @@ local function parse_legacy_modifiers(ctx, index)
 		modifier = setmetatable(modifier, { __index = found_modifier })
 		modifier.Value = modifier:ParseArgs(ctx.CurrentStr:sub(args_start_index, space_index and space_index - 1 or nil))
 		modifier.EndIndex = index + (space_index or #ctx.CurrentStr)
+		modifier.IsLegacy = true
 
 		table.insert(ctx.Modifiers, 1, modifier)
 		ctx.CurrentStr = " " .. (space_index and ctx.CurrentStr:sub(space_index + 1) or "")

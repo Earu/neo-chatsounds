@@ -31,6 +31,7 @@ function MODIFIER:GetValue()
 
 		return ret
 	end
+
 	return self.Value
 end
 
