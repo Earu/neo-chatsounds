@@ -22,7 +22,7 @@ Typically you can either add sounds in [this repo](https://github.com/Metastruct
 **`Do check their readme.md!`**
 
 ## Modifiers ?
-Modifiers are a big part of chatsounds, they also you to transform sounds and make them into something else. [Some people even made songs with them!](https://soundcloud.com/capsadmin).
+Modifiers are a big part of chatsounds, they allow you to transform sounds and make them into something else. [Some people even made songs with them!](https://soundcloud.com/capsadmin).
 
 ### Here's an example:
 
