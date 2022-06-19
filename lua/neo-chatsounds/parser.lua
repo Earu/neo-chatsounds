@@ -25,18 +25,25 @@ end
 local function assign_modifiers(ctx, sounds)
 	if not sounds then return end
 
-	for i = 0, #sounds do
-		local index = #sounds - i
-		for j, modifier in pairs(ctx.Modifiers) do
+	while #ctx.Modifiers > 0 do
+		for i = 0, #sounds do
 			chatsounds.Runners.Yield()
 
+			local index = #sounds - i
+			local modifier = ctx.Modifiers[1]
 			local sound_data = sounds[index]
 			if not sound_data then continue end
 
-			local next_sound_data = ctx.Modifiers[j + 1]
+			local next_sound_data = sounds[index - 1]
 			if modifier.StartIndex > sound_data.EndIndex and ((next_sound_data and modifier.EndIndex < next_sound_data.StartIndex) or not next_sound_data) then
 				table.insert(sound_data.Modifiers, modifier)
-				table.remove(ctx.Modifiers, j)
+				table.remove(ctx.Modifiers, 1)
+			end
+
+			if index == 0 then
+				chatsounds.Error("modifier didnt match any sounds??", modifier)
+				table.remove(ctx.Modifiers, 1)
+				break
 			end
 		end
 	end
@@ -173,6 +180,7 @@ local scope_handlers = {
 					Type = "modifier",
 					Name = modifier_name,
 					StartIndex = index,
+					EndIndex = last_scope_child.EndIndex,
 					Scope = last_scope_child,
 				}, { __index = modifier_lookup[modifier_name] })
 
@@ -186,6 +194,7 @@ local scope_handlers = {
 					Type = "modifier",
 					Name = modifier_name,
 					StartIndex = index,
+					EndIndex = index + #modifier_name,
 					Value = modifier_lookup[modifier_name].DefaultValue,
 				}, { __index = modifier_lookup[modifier_name] })
 			end
@@ -223,11 +232,12 @@ local function parse_legacy_modifiers(ctx, index)
 	end
 
 	if found_modifier then
-		local modifier = { Type = "modifier", Name = found_modifier.Name, StartIndex = index }
+		local modifier = { Type = "modifier", Name = found_modifier.Name, StartIndex = index + 1}
 		local space_index = ctx.CurrentStr:find("[\t\n\r%s]", 1)
 
 		modifier = setmetatable(modifier, { __index = found_modifier })
 		modifier.Value = modifier:ParseArgs(ctx.CurrentStr:sub(args_start_index, space_index and space_index - 1 or nil))
+		modifier.EndIndex = index + (space_index or #ctx.CurrentStr)
 
 		table.insert(ctx.Modifiers, 1, modifier)
 		ctx.CurrentStr = " " .. (space_index and ctx.CurrentStr:sub(space_index + 1) or "")
