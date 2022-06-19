@@ -28,6 +28,8 @@ function MODIFIER:GetValue()
 		else
 			ret[2] = math.max(0, ret[2])
 		end
+
+		return ret
 	end
 
 	return self.Value

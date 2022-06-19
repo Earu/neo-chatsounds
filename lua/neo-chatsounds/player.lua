@@ -256,6 +256,10 @@ if CLIENT then
 							end
 
 							timer.Simple(stream.Duration, function()
+								if not stream.Overlap then
+									stream:Remove()
+								end
+
 								sound_task:resolve()
 							end)
 
