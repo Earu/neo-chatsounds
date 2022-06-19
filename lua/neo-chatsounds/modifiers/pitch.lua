@@ -25,7 +25,7 @@ function MODIFIER:OnStreamInit(stream)
 end
 
 function MODIFIER:OnStreamThink(stream)
-	stream:SetPlaybackRate(self.Value)
+	stream:SetPlaybackRate(self.ExpressionFn and self.ExpressionFn() or self.Value)
 end
 
 return MODIFIER

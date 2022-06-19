@@ -13,7 +13,8 @@ end
 function MODIFIER:OnStreamThink(stream)
 	if not self.StreamStarted then
 		self.StreamStarted = true
-		stream:SetSamplePosition(stream:GetSampleCount() * self.Value)
+		local value = self.ExpressionFn and self.ExpressionFn() or self.Value
+		stream:SetSamplePosition(stream:GetSampleCount() * value)
 	end
 end
 
