@@ -56,9 +56,9 @@ Right now there has never been a documentation made for the chatsounds syntax, o
 
 ## What is this useful for?
 Absolutely nothing, this is only for fun and it is very possible that you may not see any added value to it. If you wish to see it in action you can always join these servers:
-- [Meta Construct EU #1](steam://connect/g1.metastruct.net)
-- [Meta Construct EU #2](steam://connect/g2.metastruct.net)
-- [Meta Construct US #3](steam://connect/g3.metastruct.net)
+- Meta Construct EU #1 - steam://connect/g1.metastruct.net
+- Meta Construct EU #2 - steam://connect/g2.metastruct.net
+- Meta Construct US #3 - steam://connect/g3.metastruct.net
 
 ## Contributing
 Any contribution is welcome so long as it **`TESTED`** before. Please do respect the existing coding conventions (naming, etc...) and make sure your code is optimized, performances matter **especially in this project**.
