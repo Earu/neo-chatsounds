@@ -11,11 +11,15 @@ function MODIFIER:ParseArgs(args)
 	return math.max(0, n) / 100
 end
 
+function MODIFIER:GetValue()
+	if isfunction(self.ExpressionFn) or not self.Value then return self.DefaultValue end
+	return self.Value
+end
+
 function MODIFIER:OnStreamThink(stream)
 	if not self.StreamStarted then
 		self.StreamStarted = true
-		local value = self.ExpressionFn and self.ExpressionFn() or self.Value
-		stream:SetSamplePosition(stream:GetSampleCount() * value)
+		stream:SetSamplePosition(stream:GetSampleCount() * self:GetValue())
 	end
 end
 

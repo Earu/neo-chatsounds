@@ -11,9 +11,21 @@ function MODIFIER:ParseArgs(args)
 	return math.max(0, duration)
 end
 
+function MODIFIER:GetValue()
+	if not self.Value then return self.DefaultValue end
+	if isfunction(self.ExpressionFn) then
+		local _, ret = pcall(self.ExpressionFn)
+		if not isnumber(ret) then return self.DefaultValue end
+
+		return math.max(0, ret)
+	end
+
+	return self.Value
+end
+
 function MODIFIER:OnStreamInit(stream)
 	if self.Value ~= -1 then
-		stream.Duration = self.Value
+		stream.Duration = self:GetValue()
 	end
 
 	if self.IsLegacy then

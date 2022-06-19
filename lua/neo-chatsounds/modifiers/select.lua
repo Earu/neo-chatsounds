@@ -13,7 +13,7 @@ function MODIFIER:ParseArgs(args)
 end
 
 function MODIFIER:OnSelection(index, matching_sounds)
-	if self.Value == -1 then return index, matching_sounds end
+	if isfunction(self.ExpressionFn) or self.Value == -1 then return index, matching_sounds end
 	return self.Value, matching_sounds
 end
 
