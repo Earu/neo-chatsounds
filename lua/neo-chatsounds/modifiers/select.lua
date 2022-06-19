@@ -2,7 +2,6 @@ local MODIFIER = {}
 
 MODIFIER.Name = "select"
 MODIFIER.LegacySyntax = "#"
-MODIFIER.OnlyLegacy = true
 MODIFIER.DefaultValue = 0
 
 function MODIFIER:ParseArgs(args)
