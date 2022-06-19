@@ -256,10 +256,6 @@ if CLIENT then
 							end
 
 							timer.Simple(stream.Duration, function()
-								if IsValid(stream) then
-									stream:Remove()
-								end
-
 								sound_task:resolve()
 							end)
 
