@@ -25,8 +25,9 @@ local function lerp(m, a, b)
 end
 
 function MODIFIER:OnStreamThink(stream)
+	local value = self.ExpressionFn and self.ExpressionFn() or self.Value
 	local f = (SysTime() - self.StartTime) / self.Duration
-	local pitch = lerp(f, self.Value[1], self.Value[2]) / 100
+	local pitch = lerp(f, value[1], value[2]) / 100
 
 	stream:SetPlaybackRate(pitch)
 

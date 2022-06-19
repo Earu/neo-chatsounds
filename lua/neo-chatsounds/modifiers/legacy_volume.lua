@@ -22,8 +22,9 @@ local function lerp(m, a, b)
 end
 
 function MODIFIER:OnStreamThink(stream)
+	local value = self.ExpressionFn and self.ExpressionFn() or self.Value
 	local f = (SysTime() - self.StartTime) / stream.duration
-	local vol = lerp(f, self.Value[1], self.Value[2]) / 100
+	local vol = lerp(f, value[1], value[2]) / 100
 
 	stream:SetVolume(vol)
 end

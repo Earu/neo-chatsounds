@@ -19,7 +19,7 @@ function MODIFIER:LegacyParseArgs(args)
 end
 
 function MODIFIER:OnStreamThink(stream)
-	stream:SetVolume(self.Value)
+	stream:SetVolume(self.ExpressionFn and self.ExpressionFn() or self.Value)
 end
 
 return MODIFIER
