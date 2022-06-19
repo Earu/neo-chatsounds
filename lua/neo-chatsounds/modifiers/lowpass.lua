@@ -5,7 +5,7 @@ MODIFIER.DefaultValue = 0.5
 
 function MODIFIER:ParseArgs(args)
 	local cutoff = tonumber(args)
-	if not cutoff then return self.DefaultValu end
+	if not cutoff then return self.DefaultValue end
 
 	return math.min(1, cutoff)
 end
