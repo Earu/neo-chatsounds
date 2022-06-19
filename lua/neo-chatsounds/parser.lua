@@ -184,9 +184,11 @@ local scope_handlers = {
 					Scope = last_scope_child,
 				}, { __index = modifier_lookup[modifier_name] })
 
-				modifier.Value = last_scope_child.ExpressionFn
-					and last_scope_child.ExpressionFn -- if there was a lua expression in the scope, use that
-					or modifier:ParseArgs(raw_str:sub(last_scope_child.StartIndex + 1, last_scope_child.EndIndex - 1))
+				if last_scope_child.ExpressionFn then
+					modifier.ExpressionFn = last_scope_child.ExpressionFn
+				end
+
+				modifier.Value = modifier:ParseArgs(raw_str:sub(last_scope_child.StartIndex + 1, last_scope_child.EndIndex - 1))
 			end
 		else
 			if modifier_lookup[modifier_name] then
