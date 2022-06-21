@@ -26,10 +26,9 @@ local function assign_modifiers(ctx, sounds)
 	if not sounds then return end
 
 	while #ctx.Modifiers > 0 do
-		for i = 0, #sounds do
+		for index = #sounds, 1, -1 do
 			chatsounds.Runners.Yield()
 
-			local index = #sounds - i
 			local modifier = ctx.Modifiers[1]
 			if not modifier then break end
 
@@ -73,11 +72,8 @@ local function parse_sounds(index, ctx)
 		while start_index <= #ctx.CurrentStr do
 			local matched = false
 			local last_space_index = -1
-			for i = 0, #ctx.CurrentStr do
+			for relative_index = #ctx.CurrentStr, start_index, -1 do
 				chatsounds.Runners.Yield()
-
-				local relative_index = #ctx.CurrentStr - i
-				if relative_index < start_index then break end -- cant go lower than start index
 
 				-- we only want to match with words so account for space chars and end of string
 				if SPACE_CHARS[ctx.CurrentStr[relative_index]] or i == 0 then
@@ -126,6 +122,9 @@ end
 local scope_handlers = {
 	["("] = function(raw_str, index, ctx)
 		if ctx.InLuaExpression then return end
+
+		local cur_scope = ctx.Scopes[#ctx.Scopes]
+		if cur_scope.Root then return end
 
 		parse_sounds(index, ctx)
 
@@ -226,15 +225,17 @@ local scope_handlers = {
 	end,
 }
 
+local MAX_LEGACY_MODIFIER_LEN = 2
 local function parse_legacy_modifiers(ctx, index)
 	local found_modifier
 	local args_start_index
-	if modifier_lookup[ctx.CurrentStr:sub(1, 2)] then
-		found_modifier = modifier_lookup[ctx.CurrentStr:sub(1, 2)]
-		args_start_index = 3
-	elseif modifier_lookup[ctx.CurrentStr[1]] then
-		found_modifier = modifier_lookup[ctx.CurrentStr[1]]
-		args_start_index = 2
+	for i = MAX_LEGACY_MODIFIER_LEN, 1, -1 do
+		local modifier_name = ctx.CurrentStr:sub(1, i)
+		if modifier_lookup[modifier_name] then
+			found_modifier = modifier_name
+			args_start_index = i + 1
+			break
+		end
 	end
 
 	if found_modifier then
@@ -276,10 +277,9 @@ local function parse_str(raw_str)
 		LastSound = nil,
 	}
 
-	for i = 0, #raw_str do
+	for index = #raw_str, 1, -1 do
 		chatsounds.Runners.Yield()
 
-		local index = #raw_str - i
 		local char = raw_str[index]
 		if scope_handlers[char] then
 			scope_handlers[char](raw_str, index, ctx)

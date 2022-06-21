@@ -26,6 +26,12 @@ function chatsounds.Error(err)
 	metalog.error("neo-chatsounds", nil, err)
 end
 
+local CS_ENABLE = CreateConVar("chatsounds_enable", "1", FCVAR_ARCHIVE, "Enables/disables chatsounds", 0, 1)
+chatsounds.Enabled = CS_ENABLE:GetBool()
+cvars.AddChangeCallback("chatsounds_enable", function()
+	chatsounds.Enabled = CS_ENABLE:GetBool()
+end)
+
 -- external deps
 do
 	AddCSLuaFile("neo-chatsounds/dependencies/find_head_pos.lua")

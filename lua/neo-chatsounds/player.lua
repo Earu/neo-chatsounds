@@ -345,9 +345,8 @@ if CLIENT then
 		handler(ply, str)
 	end)
 
-	local CS_ENABLE = CreateConVar("chatsounds_enable", "1", FCVAR_ARCHIVE, "Enables/disables chatsounds", 0, 1)
 	net.Receive("chatsounds", function()
-		if not CS_ENABLE:GetBool() then return end
+		if not chatsounds.Enabled then return end
 
 		local ply = net.ReadEntity()
 		local text = net.ReadString()

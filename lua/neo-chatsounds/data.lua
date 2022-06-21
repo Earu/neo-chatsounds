@@ -5,10 +5,7 @@ data.Lookup = data.Lookup or {
 	List = {
 		["sh"] = {} -- needed for stopping sounds
 	},
-	Tree = {
-		Children = {},
-		EndNode = false,
-	},
+	Dynamic = {},
 }
 
 function data.CacheRepository(repo)
@@ -55,8 +52,8 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 			end
 
 			timer.Simple(delay + 1, function()
-				data.BuildFromGithub(repo, branch, base_path, force_recompile):next(function()
-					t:resolve()
+				data.BuildFromGithub(repo, branch, base_path, force_recompile):next(function(recompiled)
+					t:resolve(recompiled)
 				end, function(err)
 					t:reject(err)
 				end)
@@ -77,7 +74,7 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 			if cached_hash == hash then
 				chatsounds.Log(("%s is up to date, not re-compiling lists"):format(repo))
 				data.LoadCachedRepository(repo)
-				t:resolve()
+				t:resolve(false)
 
 				return
 			else
@@ -136,7 +133,7 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 			end
 
 			data.CacheRepository(repo)
-			t:resolve()
+			t:resolve(true)
 			chatsounds.Log(("Compiled %d sounds from %s/%s in %s second(s)"):format(sound_count, repo, branch, tostring(SysTime() - start_time)))
 		end):next(nil, function(err) t:reject(err) end)
 	end, function(err) t:reject(err) end)
@@ -144,19 +141,100 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 	return t
 end
 
-local function merge_repos()
+-- Dynamically expanding table, this took me a while to figure out so I'll try to explain it.
+-- Because the lookup for the sound key of chatsounds is that large, its not appropriate to iterate over it for suggestions.
+-- The time complexity would be O(n) and essentially the game would freeze for 5/10 seconds each time you type a character.
+-- The idea here is to subdivide the sound keys into recursive chunks of 25 sounds MAX each.
+-- They can be then indexed by the depth marked at first level of the table e.g (lookup.Dynamic['g'].__depth or 1).
+-- Depending on the depth we may have something like: lookup.Dynamic = { ['g'] = { __depth = 2, ['a'] = { "im looking at gay porno", "gay porno", "gay" } } }
+-- By diving sound keys into chunks we ensure that the time complexity needed to build a suggestion list is minimal because accessing a table with a hash key is O(1),
+-- that brings the total time complexity to somewhere around O(d + n) where d is the depth and n the amount of sound keys at that depth.
+-- Building this kind of lookup however is very expensive, which is why it should only be done ONCE, and then CACHED if possible.
+local MAX_DYN_CHUNK_CHUNK_SIZE = 25
+local function build_dynamic_lookup(dyn_lookup, sound_key)
+	local words = sound_key:Split(" ")
+	if data.Loading then
+		data.Loading.Target = data.Loading.Target + #words
+	end
+
+	for _, word_key in ipairs(words) do
+		chatsounds.Runners.Yield()
+
+		local first_char = word_key[1]
+		if not dyn_lookup[first_char] then
+			dyn_lookup[first_char] = {
+				Sounds = {},
+				Keys = {},
+			}
+		end
+
+		local root_lookup = dyn_lookup[first_char]
+		local local_lookup = dyn_lookup[first_char]
+		if local_lookup.__depth then
+			for i = 2, #word_key do
+				local char = word_key[i]
+				if not local_lookup[char] then
+					root_lookup.__depth = i
+					local_lookup.Keys[char] = {
+						Sounds = {},
+						Keys = {},
+					}
+				end
+
+				local_lookup = local_lookup.Keys[char]
+			end
+		end
+
+		table.insert(local_lookup.Sounds, sound_key)
+
+		if #local_lookup >= MAX_DYN_CHUNK_CHUNK_SIZE then
+			local depth = root_lookup.__depth or 1
+			for i, chunked_sound_key in ipairs(local_lookup.Sounds) do
+				chatsounds.Runners.Yield()
+
+				local char = chunked_sound_key[depth + 1]
+				if char then
+					if not local_lookup.Keys[char] then
+						local_lookup.Keys[char] = {
+							Sounds = {},
+							Keys = {},
+						}
+					end
+
+					table.insert(local_lookup.Keys[char], table.remove(local_lookup.Sounds, i))
+				end
+			end
+
+			root_lookup.__depth = depth + 1
+		end
+
+		update_loading_state()
+	end
+end
+
+local function merge_repos(rebuild_dynamic_lookup)
+	local should_build_dynamic = false
+	if CLIENT and (rebuild_dynamic_lookup or not file.Exists("chatsounds/dyn_lookup.json", "DATA")) then
+		should_build_dynamic = true
+	end
+
 	return chatsounds.Runners.Execute(function()
 		local lookup = {
 			List = {
 				["sh"] = {} -- needed for stopping sounds
 			},
-			Tree = {
-				Children = {},
-				EndNode = false,
-			},
+			Dynamic = {},
 		}
 
-		local words = {}
+		if not should_build_dynamic then
+			local json = file.Read("chatsounds/dyn_lookup.json", "DATA")
+			if not json then
+				should_build_dynamic = true
+			else
+				lookup.Dynamic = chatsounds.Json.decode(json)
+			end
+		end
+
 		for _, repo in pairs(data.Repositories) do
 			for sound_key, sound_list in pairs(repo.List) do
 				if not lookup.List[sound_key] then
@@ -169,36 +247,15 @@ local function merge_repos()
 					update_loading_state()
 				end
 
-				if CLIENT then
-					local key_chunks = sound_key:Split(" ")
-					local cur_tree_node = lookup.Tree
-					for i, chunk in pairs(key_chunks) do
-						chatsounds.Runners.Yield()
-
-						if not words[chunk] then
-							words[chunk] = {}
-						end
-
-						table.insert(words[chunk], sound_key)
-
-						if not cur_tree_node.Children[chunk] then
-							cur_tree_node.Children[chunk] = {
-								Children = {},
-								Keys = words[chunk],
-								EndNode = false,
-							}
-						end
-
-						cur_tree_node = cur_tree_node.Children[chunk]
-
-						if i == #key_chunks then
-							cur_tree_node.EndNode = true
-						end
-
-						table.insert(cur_tree_node.Keys, sound_key)
-					end
+				if should_build_dynamic then
+					build_dynamic_lookup(lookup.Dynamic, sound_key)
 				end
 			end
+		end
+
+		if should_build_dynamic then
+			local json = chatsounds.Json.encode(lookup.Dynamic)
+			file.Write("chatsounds/dyn_lookup.json", json)
 		end
 
 		data.Lookup = lookup
@@ -216,11 +273,21 @@ function data.CompileLists(force_recompile)
 	chatsounds.Tasks.all({
 		data.BuildFromGithub("Metastruct/garrysmod-chatsounds", "master", "sound/chatsounds/autoadd", force_recompile),
 		data.BuildFromGithub("PAC3-Server/chatsounds", "master", "sounds/chatsounds", force_recompile),
-	}):next(function()
+	}):next(function(results)
+		local rebuild_dynamic_lookup = force_recompile
+		if not force_recompile then
+			for _, recompiled in ipairs(results) do
+				if recompiled then
+					rebuild_dynamic_lookup = true
+					break
+				end
+			end
+		end
+
 		data.Loading.Current = 0
 		data.Loading.Text = "Merging chatsounds repositories... %d%%"
 
-		merge_repos():next(function()
+		merge_repos(rebuild_dynamic_lookup):next(function()
 			data.Loading = nil
 			chatsounds.Log("Done compiling all lists")
 			hook.Run("ChatsoundsInitialized")
@@ -300,6 +367,7 @@ if CLIENT then
 	hook.Add("HUDPaint", "chatsounds.Data.Loading", function()
 		if not data.Loading then return end
 		if not LocalPlayer():IsTyping() then return end
+		if not chatsounds.Enabled then return end
 
 		local chat_x, chat_y = chat.GetChatBoxPos()
 		local _, chat_h = chat.GetChatBoxSize()
@@ -314,39 +382,34 @@ if CLIENT then
 	data.Suggestions = data.Suggestions or {}
 	data.SuggestionsIndex = -1
 	hook.Add("ChatTextChanged", "chatsounds.Data.Completion", function(text)
+		if not chatsounds.Enabled then return end
+
 		data.BuildCompletionSuggestions(text)
 	end)
 
 	hook.Add("OnChatTab", "chatsounds.Data.Completion", function(text)
+		if not chatsounds.Enabled then return end
+
 		local scroll = (input.IsButtonDown(KEY_LSHIFT) or input.IsButtonDown(KEY_RSHIFT) or input.IsKeyDown(KEY_LCONTROL)) and -1 or 1
 		data.SuggestionsIndex = (data.SuggestionsIndex + scroll) % #data.Suggestions
 
 		return data.Suggestions[data.SuggestionsIndex + 1]
 	end)
 
-	local table_count = table.Count
-	local function add_nested_suggestions(node, base, suggestions, existing_suggestions)
-		for key, child_node in pairs(node.Children) do
-			local sound_key = (base .. " " .. key):Trim()
-			if table_count(child_node.Children) == 0 then
-				if not existing_suggestions[sound_key] then
-					table.insert(suggestions, sound_key)
-					existing_suggestions[sound_key] = true
-				end
-			else
-				if child_node.EndNode and not existing_suggestions[sound_key] then
-					table.insert(suggestions, sound_key)
-					existing_suggestions[sound_key] = true
-				end
-
-				add_nested_suggestions(child_node, sound_key, suggestions, existing_suggestions)
+	local function add_nested_suggestions(node, text, nested_suggestions)
+		for _, sound_key in ipairs(node.Sounds) do
+			if sound_key:find(text, 1, true) then
+				table.insert(nested_suggestions, sound_key)
 			end
+		end
+
+		for key, child_node in pairs(node.Keys) do
+			add_nested_suggestions(child_node, text, nested_suggestion)
 		end
 	end
 
-	local completion_sepatator = "=================="
 	function data.BuildCompletionSuggestions(text)
-		text = text:gsub("[%s\n\r\t]+"," "):gsub("[\"\']", "")
+		text = text:gsub("[%s\n\r\t]+"," "):gsub("[\"\']", ""):Trim()
 
 		if #text == 0 then
 			data.Suggestions = {}
@@ -354,45 +417,31 @@ if CLIENT then
 			return
 		end
 
-		local tree_node = data.Lookup.Tree
-		local text_chunks = text:Split(" ")
+		local search_words = text:Split(" ")
+		local last_word = search_words[#search_words]
+
+		local sounds = {}
 		local suggestions = {}
-		local existing_suggestions = {}
-		for i, chunk in ipairs(text_chunks) do
-			local chunk_text = chunk:lower():Trim()
-			if i == #text_chunks then
-				local base = table.concat(text_chunks, " ", 1, i - 1)
-				for sound_key, child_node in pairs(tree_node.Children) do
-					if not sound_key:StartWith(chunk_text) then continue end
+		local node = data.Lookup.Dynamic[last_word[1]]
+		if node.__depth then
+			for i = 2, #last_word do
+				if not last_word[i] then break end
 
-					local partial_sound_key = (base .. " " .. sound_key):Trim()
-					if table_count(child_node.Children) > 0 then
-						if child_node.EndNode and not existing_suggestions[partial_sound_key] then
-							table.insert(suggestions, partial_sound_key)
-							existing_suggestions[partial_sound_key] = true
-						end
+				node = node.Keys[last_word[i]]
+			end
 
-						add_nested_suggestions(child_node, partial_sound_key, suggestions, existing_suggestions)
-					else
-						if not existing_suggestions[partial_sound_key] then
-							table.insert(suggestions, partial_sound_key)
-							existing_suggestions[partial_sound_key] = true
-						end
-					end
+			sounds = node.Sounds
 
-					for _, matching_sound_key in ipairs(child_node.Keys) do
-						if matching_sound_key:find(text, 1, true) and not existing_suggestions[matching_sound_key] then
-							table.insert(suggestions, matching_sound_key)
-							existing_suggestions[matching_sound_key] = true
-						end
-					end
-				end
-			else
-				-- if we're not on the last chunk, we need to check if the next chunk is a valid chatsound
-				local new_tree_node = tree_node.Children[chunk_text]
-				if not new_tree_node then break end
+			for _, child_node in ipairs(node.Keys) do
+				add_nested_suggestions(child_node, text, suggestions)
+			end
+		else
+			sounds = node.Sounds
+		end
 
-				tree_node = new_tree_node
+		for _, sound_key in ipairs(sounds) do
+			if sound_key:find(text, 1, true) then
+				table.insert(suggestions, sound_key)
 			end
 		end
 
@@ -400,16 +449,16 @@ if CLIENT then
 			return a:byte() < b:byte()
 		end)
 
-		completion_sepatator = ("="):rep((suggestions[#suggestions] or "=================="):len() + 5)
-
 		data.SuggestionsIndex = -1
 		data.Suggestions = suggestions
 	end
 
 	local FONT_HEIGHT = 20
+	local COMPLETION_SEP = "=================="
 	hook.Add("HUDPaint", "chatsounds.Data.Completion", function()
 		if data.Loading then return end
 		if #data.Suggestions == 0 then return end
+		if not chatsounds.Enabled then return end
 
 		local chat_x, chat_y = chat.GetChatBoxPos()
 		local _, chat_h = chat.GetChatBoxSize()
@@ -435,7 +484,7 @@ if CLIENT then
 		end
 
 		if data.SuggestionsIndex + 1 ~= 1 then
-			draw_shadowed_text(completion_sepatator, base_x, base_y + (i - 1) * FONT_HEIGHT, 180, 180, 255, 255)
+			draw_shadowed_text(COMPLETION_SEP, base_x, base_y + (i - 1) * FONT_HEIGHT, 180, 180, 255, 255)
 			i = i + 1
 		end
 
