@@ -242,6 +242,10 @@ if CLIENT then
 						return
 					end
 
+					if not stream.IsValid then
+						stream.IsValid = function() return false end
+					end
+
 					local started = false
 					hook.Add("Think", stream, function()
 						if not started then

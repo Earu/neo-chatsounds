@@ -26,25 +26,20 @@ local function assign_modifiers(ctx, sounds)
 	if not sounds then return end
 
 	while #ctx.Modifiers > 0 do
-		for index = #sounds, 1, -1 do
+		for index = 1, #sounds do
 			chatsounds.Runners.Yield()
 
 			local modifier = ctx.Modifiers[1]
-			if not modifier then break end
+			if not modifier then return end
 
 			local sound_data = sounds[index]
-			if not sound_data then continue end
-
-			local next_sound_data = sounds[index - 1]
-			if modifier.StartIndex > sound_data.EndIndex and ((next_sound_data and modifier.EndIndex < next_sound_data.StartIndex) or not next_sound_data) then
-				table.insert(sound_data.Modifiers, modifier)
-				table.remove(ctx.Modifiers, 1)
-			end
-
-			if index == 0 then
-				chatsounds.Error("modifier didnt match any sounds??", modifier)
-				table.remove(ctx.Modifiers, 1)
-				break
+			if #sounds == index then
+				table.insert(sound_data.Modifiers, table.remove(ctx.Modifiers, 1))
+			else
+				local next_sound_data = sounds[index + 1]
+				if modifier.EndIndex <= next_sound_data.StartIndex and modifier.StartIndex >= sound_data.EndIndex then
+					table.insert(sound_data.Modifiers, table.remove(ctx.Modifiers, 1))
+				end
 			end
 		end
 	end
@@ -65,7 +60,6 @@ local function parse_sounds(index, ctx)
 			ParentScope = cur_scope,
 		}
 
-		ctx.LastSound = new_sound
 		table.insert(cur_scope.Sounds, new_sound)
 	else
 		local start_index = 1
@@ -80,7 +74,7 @@ local function parse_sounds(index, ctx)
 					last_space_index = relative_index
 
 					local str_chunk = ctx.CurrentStr:sub(start_index, relative_index):gsub("[\"\']", ""):Trim() -- need to trim here, because the player can chain multiple spaces
-					if chatsounds.Data.Lookup.List[str_chunk] then
+					if #str_chunk > 0 and chatsounds.Data.Lookup.List[str_chunk] then
 						cur_scope.Sounds = cur_scope.Sounds or {}
 						local new_sound = {
 							Key = str_chunk,
@@ -91,7 +85,8 @@ local function parse_sounds(index, ctx)
 							ParentScope = cur_scope,
 						}
 
-						ctx.LastSound = new_sound
+						-- TODO: Assign modifiers here, startindex and endindex are wrong, maybe for modifiers too
+
 						table.insert(cur_scope.Sounds, new_sound)
 						start_index = relative_index + 1
 						matched = true
@@ -274,7 +269,6 @@ local function parse_str(raw_str)
 		Modifiers = {},
 		CurrentStr = "",
 		LastCurrentStrSpaceIndex = -1,
-		LastSound = nil,
 	}
 
 	for index = #raw_str, 1, -1 do
@@ -295,6 +289,7 @@ local function parse_str(raw_str)
 
 	parse_sounds(0, ctx)
 
+	PrintTable(global_scope)
 	return coroutine.yield(global_scope)
 end
 
