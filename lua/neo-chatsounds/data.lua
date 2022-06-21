@@ -8,34 +8,144 @@ data.Lookup = data.Lookup or {
 	Dynamic = {},
 }
 
-function data.CacheRepository(repo)
+function data.CacheRepository(repo, branch, path)
 	if not file.Exists("chatsounds/repos", "DATA") then
 		file.CreateDir("chatsounds/repos")
 	end
 
-	local json = chatsounds.Json.encode(data.Repositories[repo])
-	file.Write("chatsounds/repos/" .. util.SHA1(repo) .. ".json", json)
+	local json = chatsounds.Json.encode(data.Repositories[("%s/%s/%s"):format(repo, branch, path)])
+	file.Write("chatsounds/repos/" .. util.SHA1(repo .. branch .. path) .. ".json", json)
 end
 
-function data.LoadCachedRepository(repo)
-	local repo_cache_path = "chatsounds/repos/" .. util.SHA1(repo) .. ".json"
+function data.LoadCachedRepository(repo, branch, path)
+	local repo_cache_path = "chatsounds/repos/" .. util.SHA1(repo .. branch .. path) .. ".json"
 
 	if not file.Exists(repo_cache_path, "DATA") then return end
 
 	local json = file.Read(repo_cache_path, "DATA")
-	data.Repositories[repo] = chatsounds.Json.decode(json)
+	data.Repositories[("%s/%s/%s"):format(repo, branch, path)] = chatsounds.Json.decode(json)
 end
 
 local function update_loading_state()
 	if data.Loading then
 		data.Loading.Current = data.Loading.Current + 1
 
-		local cur_perc = math.min(100, math.Round((data.Loading.Current / data.Loading.Target) * 100))
+		local cur_perc = math.max(0, math.min(100, math.Round((data.Loading.Current / data.Loading.Target) * 100)))
 		if cur_perc % 10 == 0 and cur_perc ~= data.Loading.LastLoggedPercent and (CLIENT or (SERVER and game.IsDedicated())) then
 			data.Loading.LastLoggedPercent = cur_perc
 			chatsounds.Log((data.Loading.Text):format(cur_perc))
 		end
 	end
+end
+
+local function handle_rate_limit(http_res, base_task, task_fn, ...)
+	if http_res.Status == 429 or http_res.Status == 503 or http_res.Status == 403 then
+		local delay = tonumber(http_res.Headers["Retry-After"] or http_res.Headers["retry-after"])
+		if not delay then
+			base_task:reject("Github API rate limit exceeded")
+			return true
+		end
+
+		local args = { ... }
+		timer.Simple(delay + 1, function()
+			task_fn(unpack(args)):next(function(...)
+				base_task:resolve(...)
+			end, function(err)
+				base_task:reject(err)
+			end)
+		end)
+
+		chatsounds.Log(("Github API rate limit exceeded, retrying in %s seconds"):format(delay))
+		return true
+	end
+
+	return false
+end
+
+local function check_cache_validity(body, repo, path, branch)
+	local hash = util.SHA1(body)
+	local cache_path = ("chatsounds/repos/%s.json"):format(util.SHA1(repo .. branch .. path))
+	if file.Exists(cache_path, "DATA") then
+		chatsounds.Log(("Found cached repository for %s/%s/%s, validating content..."):format(repo, branch, path))
+
+		local cache_contents = file.Read(cache_path, "DATA")
+		local cached_repo = chatsounds.Json.decode(cache_contents)
+		local cached_hash = cached_repo.Hash
+		return cached_hash == hash, hash
+	end
+
+	return false, hash
+end
+
+function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
+	branch = branch or "master"
+
+	local msg_pack_url = ("https://raw.githubusercontent.com/%s/%s/%s/list.msgpack"):format(repo, branch, base_path)
+	local t = chatsounds.Tasks.new()
+	chatsounds.Http.Get(msg_pack_url):next(function(res)
+		local rate_limited = handle_rate_limit(res, t, data.BuildFromGitHubMsgPack, repo, branch, base_path, force_recompile)
+		if rate_limited then return end
+
+		local is_cache_valid, hash = check_cache_validity(res.Body, repo, base_path, branch)
+		if is_cache_valid and not force_recompile then
+			chatsounds.Log(("%s/%s/%s is up to date, not re-compiling lists"):format(repo, branch, base_path))
+			data.LoadCachedRepository(repo, branch, base_path)
+			t:resolve(false)
+
+			return
+		else
+			chatsounds.Log(("Cached repository for %s/%s/%s is out of date, re-compiling..."):format(repo, branch, base_path))
+		end
+
+		local contents = chatsounds.MsgPack.unpack(res.Body)
+		if data.Loading then
+			data.Loading.Target = data.Loading.Target + #contents
+		end
+
+		local start_time = SysTime()
+		local sound_count = 0
+		local repo_key = ("%s/%s/%s"):format(repo, branch, base_path)
+		if not data.Repositories[repo_key] then
+			data.Repositories[repo_key] = {
+				Hash = hash,
+				List = {},
+			}
+		end
+
+		chatsounds.Runners.Execute(function()
+			for i, raw_sound_data in pairs(contents) do
+				chatsounds.Runners.Yield()
+
+				update_loading_state()
+
+				sound_count = sound_count + 1
+
+				local realm = raw_sound_data[1]:lower()
+				local sound_key = raw_sound_data[2]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " ")
+				local path = raw_sound_data[3]
+
+				if not data.Repositories[repo_key].List[sound_key] then
+					data.Repositories[repo_key].List[sound_key] = {}
+				end
+
+				local url = ("https://raw.githubusercontent.com/%s/%s/%s/%s"):format(repo, branch, base_path, path):gsub("%s", "%%20")
+				local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
+				local sound_data = {
+					Url = url,
+					Realm = realm,
+					Path = sound_path,
+				}
+
+				table.insert(data.Repositories[repo_key].List[sound_key], sound_data)
+			end
+
+			data.CacheRepository(repo, branch, base_path)
+			t:resolve(true)
+			chatsounds.Log(("Compiled %d sounds from %s/%s/%s in %s second(s)"):format(sound_count, repo, branch, base_path, tostring(SysTime() - start_time)))
+		end):next(nil, function(err) t:reject(err) end)
+	end, function(err) t:reject(err) end)
+
+	return t
 end
 
 function data.BuildFromGithub(repo, branch, base_path, force_recompile)
@@ -44,42 +154,18 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 	local api_url = ("https://api.github.com/repos/%s/git/trees/%s?recursive=1"):format(repo, branch)
 	local t = chatsounds.Tasks.new()
 	chatsounds.Http.Get(api_url):next(function(res)
-		if res.Status == 429 or res.Status == 503 or res.Status == 403 then
-			local delay = tonumber(res.Headers["Retry-After"] or res.Headers["retry-after"])
-			if not delay then
-				t:reject("Github API rate limit exceeded")
-				return
-			end
+		local rate_limited = handle_rate_limit(res, t, data.BuildFromGithub, repo, branch, base_path, force_recompile)
+		if rate_limited then return end
 
-			timer.Simple(delay + 1, function()
-				data.BuildFromGithub(repo, branch, base_path, force_recompile):next(function(recompiled)
-					t:resolve(recompiled)
-				end, function(err)
-					t:reject(err)
-				end)
-			end)
+		local is_cache_valid, hash = check_cache_validity(res.Body, repo, base_path, branch)
+		if is_cache_valid and not force_recompile then
+			chatsounds.Log(("%s/%s/%s is up to date, not re-compiling lists"):format(repo, branch, base_path))
+			data.LoadCachedRepository(repo, branch, base_path)
+			t:resolve(false)
 
-			chatsounds.Log(("Github API rate limit exceeded, retrying in %s seconds"):format(delay))
 			return
-		end
-
-		local hash = util.SHA1(res.Body)
-		local cache_path = ("chatsounds/repos/%s.json"):format(util.SHA1(repo))
-		if not force_recompile and file.Exists(cache_path, "DATA") then
-			chatsounds.Log(("Found cached repository for %s, validating content..."):format(repo))
-
-			local cache_contents = file.Read(cache_path, "DATA")
-			local cached_repo = chatsounds.Json.decode(cache_contents)
-			local cached_hash = cached_repo.Hash
-			if cached_hash == hash then
-				chatsounds.Log(("%s is up to date, not re-compiling lists"):format(repo))
-				data.LoadCachedRepository(repo)
-				t:resolve(false)
-
-				return
-			else
-				chatsounds.Log(("Cached repository for %s is out of date, re-compiling..."):format(repo))
-			end
+		else
+			chatsounds.Log(("Cached repository for %s/%s/%s is out of date, re-compiling..."):format(repo, branch, base_path))
 		end
 
 		local resp = chatsounds.Json.decode(res.Body)
@@ -94,15 +180,15 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 
 		local start_time = SysTime()
 		local sound_count = 0
-		chatsounds.Runners.Execute(function()
-			if not data.Repositories[repo] then
-				data.Repositories[repo] = {
-					Hash = hash,
-					Tree = {},
-					List = {},
-				}
-			end
+		local repo_key = ("%s/%s/%s"):format(repo, branch, base_path)
+		if not data.Repositories[repo_key] then
+			data.Repositories[repo_key] = {
+				Hash = hash,
+				List = {},
+			}
+		end
 
+		chatsounds.Runners.Execute(function()
 			for i, file_data in pairs(resp.tree) do
 				chatsounds.Runners.Yield()
 
@@ -117,8 +203,8 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 				local realm = path_chunks[2]:lower()
 				local sound_key = path_chunks[3]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " ")
 
-				if not data.Repositories[repo].List[sound_key] then
-					data.Repositories[repo].List[sound_key] = {}
+				if not data.Repositories[repo_key].List[sound_key] then
+					data.Repositories[repo_key].List[sound_key] = {}
 				end
 
 				local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, file_data.path):gsub("%s", "%%20")
@@ -129,12 +215,12 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 					Path = sound_path,
 				}
 
-				table.insert(data.Repositories[repo].List[sound_key], sound_data)
+				table.insert(data.Repositories[repo_key].List[sound_key], sound_data)
 			end
 
-			data.CacheRepository(repo)
+			data.CacheRepository(repo, branch, base_path)
 			t:resolve(true)
-			chatsounds.Log(("Compiled %d sounds from %s/%s in %s second(s)"):format(sound_count, repo, branch, tostring(SysTime() - start_time)))
+			chatsounds.Log(("Compiled %d sounds from %s/%s/%s in %s second(s)"):format(sound_count, repo, branch, base_path, tostring(SysTime() - start_time)))
 		end):next(nil, function(err) t:reject(err) end)
 	end, function(err) t:reject(err) end)
 
@@ -273,6 +359,17 @@ function data.CompileLists(force_recompile)
 	chatsounds.Tasks.all({
 		data.BuildFromGithub("Metastruct/garrysmod-chatsounds", "master", "sound/chatsounds/autoadd", force_recompile),
 		data.BuildFromGithub("PAC3-Server/chatsounds", "master", "sounds/chatsounds", force_recompile),
+
+		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "csgo", force_recompile),
+		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "css", force_recompile),
+		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "ep1", force_recompile),
+		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "ep2", force_recompile),
+		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "hl1", force_recompile),
+		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "hl2", force_recompile),
+		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "l4d", force_recompile),
+		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "l4d2", force_recompile),
+		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "portal", force_recompile),
+		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "tf2", force_recompile),
 	}):next(function(results)
 		local rebuild_dynamic_lookup = force_recompile
 		if not force_recompile then
