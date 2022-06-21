@@ -232,7 +232,7 @@ local function parse_legacy_modifiers(ctx, index)
 	for i = MAX_LEGACY_MODIFIER_LEN, 1, -1 do
 		local modifier_name = ctx.CurrentStr:sub(1, i)
 		if modifier_lookup[modifier_name] then
-			found_modifier = modifier_name
+			found_modifier = modifier_lookup[modifier_name]
 			args_start_index = i + 1
 			break
 		end
