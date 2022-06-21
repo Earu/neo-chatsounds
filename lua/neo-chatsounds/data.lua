@@ -423,20 +423,22 @@ if CLIENT then
 		local sounds = {}
 		local suggestions = {}
 		local node = data.Lookup.Dynamic[last_word[1]]
-		if node.__depth then
-			for i = 2, #last_word do
-				if not last_word[i] then break end
+		if node then
+			if node.__depth then
+				for i = 2, #last_word do
+					if not last_word[i] then break end
 
-				node = node.Keys[last_word[i]]
+					node = node.Keys[last_word[i]]
+				end
+
+				sounds = node.Sounds
+
+				for _, child_node in ipairs(node.Keys) do
+					add_nested_suggestions(child_node, text, suggestions)
+				end
+			else
+				sounds = node.Sounds
 			end
-
-			sounds = node.Sounds
-
-			for _, child_node in ipairs(node.Keys) do
-				add_nested_suggestions(child_node, text, suggestions)
-			end
-		else
-			sounds = node.Sounds
 		end
 
 		for _, sound_key in ipairs(sounds) do
