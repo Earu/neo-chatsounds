@@ -23,7 +23,7 @@ function chatsounds.Error(err)
 		return
 	end
 
-	metalog.error("neo-chatsounds", nil, err)
+	metalog.error("neo-chatsounds", CLIENT and "Client" or "Server", err)
 end
 
 local CS_ENABLE = CreateConVar("chatsounds_enable", "1", FCVAR_ARCHIVE, "Enables/disables chatsounds", 0, 1)
@@ -38,6 +38,7 @@ do
 	AddCSLuaFile("neo-chatsounds/dependencies/webaudio.lua")
 	AddCSLuaFile("neo-chatsounds/dependencies/tasks.lua")
 	AddCSLuaFile("neo-chatsounds/dependencies/json.lua")
+	AddCSLuaFile("neo-chatsounds/dependencies/msgpack.lua")
 
 	if CLIENT then
 		chatsounds.WebAudio = include("neo-chatsounds/dependencies/webaudio.lua")
@@ -45,6 +46,7 @@ do
 
 	chatsounds.Tasks = include("neo-chatsounds/dependencies/tasks.lua")
 	chatsounds.Json = include("neo-chatsounds/dependencies/json.lua")
+	chatsounds.MsgPack = include("neo-chatsounds/dependencies/msgpack.lua")
 end
 
 function chatsounds.Module(name)
