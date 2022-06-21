@@ -76,7 +76,7 @@ local function parse_sounds(index, ctx)
 				chatsounds.Runners.Yield()
 
 				-- we only want to match with words so account for space chars and end of string
-				if SPACE_CHARS[ctx.CurrentStr[relative_index]] or i == 0 then
+				if SPACE_CHARS[ctx.CurrentStr[relative_index]] or relative_index == #ctx.CurrentStr then
 					last_space_index = relative_index
 
 					local str_chunk = ctx.CurrentStr:sub(start_index, relative_index):gsub("[\"\']", ""):Trim() -- need to trim here, because the player can chain multiple spaces
