@@ -289,7 +289,7 @@ local function parse_str(raw_str)
 
 	parse_sounds(0, ctx)
 
-	PrintTable(global_scope)
+	--PrintTable(global_scope)
 	return coroutine.yield(global_scope)
 end
 
