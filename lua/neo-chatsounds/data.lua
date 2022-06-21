@@ -124,6 +124,8 @@ function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 				local sound_key = raw_sound_data[2]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " ")
 				local path = raw_sound_data[3]
 
+				if #sound_key == 0 then continue end
+
 				if not data.Repositories[repo_key].List[sound_key] then
 					data.Repositories[repo_key].List[sound_key] = {}
 				end
@@ -201,7 +203,9 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 				local path = file_data.path:gsub("^" .. base_path:PatternSafe(), "")
 				local path_chunks = path:Split("/")
 				local realm = path_chunks[2]:lower()
-				local sound_key = path_chunks[3]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " ")
+				local sound_key = path_chunks[3]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):Trim()
+
+				if #sound_key == 0 then continue end
 
 				if not data.Repositories[repo_key].List[sound_key] then
 					data.Repositories[repo_key].List[sound_key] = {}
