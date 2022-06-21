@@ -493,10 +493,11 @@ if CLIENT then
 		return data.Suggestions[data.SuggestionsIndex + 1]
 	end)
 
-	local function add_nested_suggestions(node, text, nested_suggestions)
+	local function add_nested_suggestions(node, text, nested_suggestions, added_suggestions)
 		for _, sound_key in ipairs(node.Sounds) do
-			if sound_key:find(text, 1, true) then
+			if sound_key:find(text, 1, true) and not added_suggestions[sound_key] then
 				table.insert(nested_suggestions, sound_key)
+				added_suggestions[sound_key] = true
 			end
 		end
 
@@ -519,6 +520,7 @@ if CLIENT then
 
 		local sounds = {}
 		local suggestions = {}
+		local added_suggestions = {}
 		local node = data.Lookup.Dynamic[last_word[1]]
 		if node then
 			if node.__depth then
@@ -531,7 +533,7 @@ if CLIENT then
 				sounds = node.Sounds
 
 				for _, child_node in ipairs(node.Keys) do
-					add_nested_suggestions(child_node, text, suggestions)
+					add_nested_suggestions(child_node, text, suggestions, added_suggestions)
 				end
 			else
 				sounds = node.Sounds
@@ -539,8 +541,9 @@ if CLIENT then
 		end
 
 		for _, sound_key in ipairs(sounds) do
-			if sound_key:find(text, 1, true) then
+			if sound_key:find(text, 1, true) and not added_suggestions[sound_key] then
 				table.insert(suggestions, sound_key)
+				added_suggestions[sound_key] = true
 			end
 		end
 
