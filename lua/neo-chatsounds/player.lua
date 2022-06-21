@@ -347,6 +347,7 @@ if CLIENT then
 
 	net.Receive("chatsounds", function()
 		if not chatsounds.Enabled then return end
+		if chatsouds.Data.Loading then return end
 
 		local ply = net.ReadEntity()
 		local text = net.ReadString()
