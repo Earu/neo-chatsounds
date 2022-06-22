@@ -22,30 +22,37 @@ for modifier_name, modifier in pairs(chatsounds.Modifiers) do
 	end
 end
 
-local function assign_modifiers(ctx, sounds)
-	if not sounds then return end
+local MAX_LEGACY_MODIFIER_LEN = 2
+local function parse_legacy_modifiers(ctx, index)
+	local found_modifier
+	local args_start_index
+	for i = MAX_LEGACY_MODIFIER_LEN, 1, -1 do
+		chatsounds.Runners.Yield()
 
-	while #ctx.Modifiers > 0 do
-		for index = 1, #sounds do
-			chatsounds.Runners.Yield()
-
-			local modifier = ctx.Modifiers[1]
-			if not modifier then return end
-
-			local sound_data = sounds[index]
-			if #sounds == index then
-				table.insert(sound_data.Modifiers, table.remove(ctx.Modifiers, 1))
-			else
-				local next_sound_data = sounds[index + 1]
-				if modifier.EndIndex <= next_sound_data.StartIndex and modifier.StartIndex >= sound_data.EndIndex then
-					table.insert(sound_data.Modifiers, table.remove(ctx.Modifiers, 1))
-				end
-			end
+		local modifier_name = ctx.CurrentStr:sub(1, i)
+		if modifier_lookup[modifier_name] then
+			found_modifier = modifier_lookup[modifier_name]
+			args_start_index = i + 1
+			break
 		end
+	end
+
+	if found_modifier then
+		local modifier = { Type = "modifier", Name = found_modifier.Name, StartIndex = index }
+		local space_index = ctx.CurrentStr:find("[\t\n\r%s]", 1)
+		local str_args = ctx.CurrentStr:sub(args_start_index, space_index and space_index - 1 or nil)
+
+		modifier = setmetatable(modifier, { __index = found_modifier })
+		modifier.Value = modifier:ParseArgs(str_args)
+		modifier.IsLegacy = true
+
+		table.insert(ctx.Modifiers, 1, modifier)
+
+		ctx.CurrentStr = space_index and ctx.CurrentStr:sub(1, space_index - 1) or ""
 	end
 end
 
-local function parse_sounds(index, ctx)
+local function parse_sounds(raw_str, index, ctx)
 	if #ctx.CurrentStr == 0 then return end
 
 	local cur_scope = ctx.Scopes[#ctx.Scopes]
@@ -62,33 +69,36 @@ local function parse_sounds(index, ctx)
 
 		table.insert(cur_scope.Sounds, new_sound)
 	else
-		local start_index = 1
-		while start_index <= #ctx.CurrentStr do
+		local relative_start_index = 1
+		while relative_start_index <= #ctx.CurrentStr do
 			local matched = false
 			local last_space_index = -1
-			for relative_index = #ctx.CurrentStr, start_index, -1 do
+			for relative_index = #ctx.CurrentStr, relative_start_index, -1 do
 				chatsounds.Runners.Yield()
 
 				-- we only want to match with words so account for space chars and end of string
 				if SPACE_CHARS[ctx.CurrentStr[relative_index]] or relative_index == #ctx.CurrentStr then
 					last_space_index = relative_index
 
-					local str_chunk = ctx.CurrentStr:sub(start_index, relative_index):gsub("[\"\']", ""):Trim() -- need to trim here, because the player can chain multiple spaces
+					local str_chunk = ctx.CurrentStr:sub(relative_start_index, relative_index):gsub("[\"\']", ""):Trim() -- need to trim here, because the player can chain multiple spaces
 					if #str_chunk > 0 and chatsounds.Data.Lookup.List[str_chunk] then
+						local chunk_start_index, chunk_end_index = raw_str:find(str_chunk, ctx.LastSoundParsedEndIndex, true) -- :(, forced to do that otherwise the indexes are just wrong
+						if not chunk_start_index then continue end
+
+						ctx.LastSoundParsedEndIndex = chunk_end_index
 						cur_scope.Sounds = cur_scope.Sounds or {}
+
 						local new_sound = {
 							Key = str_chunk,
 							Modifiers = {},
 							Type = "sound",
-							StartIndex = index + start_index,
-							EndIndex = index + relative_index - 1,
+							StartIndex = chunk_start_index,
+							EndIndex = chunk_end_index,
 							ParentScope = cur_scope,
 						}
 
-						-- TODO: Assign modifiers here, startindex and endindex are wrong, maybe for modifiers too
-
 						table.insert(cur_scope.Sounds, new_sound)
-						start_index = relative_index + 1
+						relative_start_index = relative_index + 1
 						matched = true
 						break
 					end
@@ -100,13 +110,11 @@ local function parse_sounds(index, ctx)
 				if last_space_index == -1 then
 					break -- no more words, break out of this loop
 				else
-					start_index = last_space_index + 1
+					relative_start_index = last_space_index + 1
 				end
 			end
 		end
 	end
-
-	assign_modifiers(ctx, cur_scope.Sounds)
 
 	-- reset the current string and modifiers
 	ctx.CurrentStr = ""
@@ -121,7 +129,7 @@ local scope_handlers = {
 		local cur_scope = ctx.Scopes[#ctx.Scopes]
 		if cur_scope.Root then return end
 
-		parse_sounds(index, ctx)
+		parse_sounds(raw_str, index, ctx)
 
 		local cur_scope = table.remove(ctx.Scopes, #ctx.Scopes)
 		cur_scope.StartIndex = index
@@ -129,7 +137,7 @@ local scope_handlers = {
 	[")"] = function(raw_str, index, ctx)
 		if ctx.InLuaExpression then return end
 
-		parse_sounds(index, ctx) -- will parse sounds and assign modifiers to said sounds if any
+		parse_sounds(raw_str, index, ctx) -- will parse sounds and assign modifiers to said sounds if any
 
 		local parent_scope = ctx.Scopes[#ctx.Scopes]
 		local new_scope = {
@@ -163,6 +171,8 @@ local scope_handlers = {
 
 				if last_scope_child.Modifiers then
 					for _, previous_modifier in ipairs(last_scope_child.Modifiers) do
+						chatsounds.Runners.Yield()
+
 						table.insert(ctx.Modifiers, previous_modifier)
 					end
 
@@ -220,33 +230,6 @@ local scope_handlers = {
 	end,
 }
 
-local MAX_LEGACY_MODIFIER_LEN = 2
-local function parse_legacy_modifiers(ctx, index)
-	local found_modifier
-	local args_start_index
-	for i = MAX_LEGACY_MODIFIER_LEN, 1, -1 do
-		local modifier_name = ctx.CurrentStr:sub(1, i)
-		if modifier_lookup[modifier_name] then
-			found_modifier = modifier_lookup[modifier_name]
-			args_start_index = i + 1
-			break
-		end
-	end
-
-	if found_modifier then
-		local modifier = { Type = "modifier", Name = found_modifier.Name, StartIndex = index + 1}
-		local space_index = ctx.CurrentStr:find("[\t\n\r%s]", 1)
-
-		modifier = setmetatable(modifier, { __index = found_modifier })
-		modifier.Value = modifier:ParseArgs(ctx.CurrentStr:sub(args_start_index, space_index and space_index - 1 or nil))
-		modifier.EndIndex = index + (space_index or #ctx.CurrentStr)
-		modifier.IsLegacy = true
-
-		table.insert(ctx.Modifiers, 1, modifier)
-		ctx.CurrentStr = " " .. (space_index and ctx.CurrentStr:sub(space_index + 1) or "")
-	end
-end
-
 local function parse_str(raw_str)
 	local global_scope = { -- global parent scope for the string
 		Children = {},
@@ -269,6 +252,7 @@ local function parse_str(raw_str)
 		Modifiers = {},
 		CurrentStr = "",
 		LastCurrentStrSpaceIndex = -1,
+		LastSoundParsedEndIndex = 1,
 	}
 
 	for index = #raw_str, 1, -1 do
@@ -282,14 +266,11 @@ local function parse_str(raw_str)
 			if SPACE_CHARS[char] then
 				ctx.LastCurrentStrSpaceIndex = index
 			end
-
-			parse_legacy_modifiers(ctx, index)
 		end
 	end
 
-	parse_sounds(0, ctx)
+	parse_sounds(raw_str, 0, ctx)
 
-	--PrintTable(global_scope)
 	return coroutine.yield(global_scope)
 end
 
