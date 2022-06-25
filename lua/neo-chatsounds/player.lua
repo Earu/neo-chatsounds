@@ -23,6 +23,23 @@ end
 if CLIENT then
 	local cs_player = chatsounds.Module("Player")
 
+	do
+		-- this is a hack to detect stopsound
+		hook.Add("InitPostEntity", "chatsounds.Player.StopSoundHack", function()
+			local snd = CreateSound(LocalPlayer(), "phx/hmetal1.wav")
+			snd:PlayEx(0, 100)
+
+			hook.Add("Think", "chatsounds.Player.StopSoundhack", function()
+				if not snd or not snd:IsPlaying() then
+					snd = CreateSound(LocalPlayer(), "phx/hmetal1.wav")
+					snd:PlayEx(0, 100)
+
+					hook.Run("StopSound")
+				end
+			end)
+		end)
+	end
+
 	function cs_player.GetWantedSound(sound_data)
 		math.randomseed(math.Round(CurTime()))
 
@@ -186,6 +203,35 @@ if CLIENT then
 		return stream
 	end
 
+	cs_player.Streams = {}
+	function cs_player.StopAllSounds()
+		for _, streams in pairs(cs_player.Streams) do
+			for k, stream in pairs(streams) do
+				stream:Remove()
+				streams[k] = nil
+			end
+		end
+
+		chatsounds.WebAudio.Panic()
+	end
+
+	hook.Add("StopSound", "chatsounds.Player.StopSound", function()
+		cs_player.StopAllSounds()
+		chatsounds.Log("Cleared all sounds!")
+	end)
+
+	local CS_SH_MODE = CreateConVar("chatsounds_sh_mode", "1", FCVAR_ARCHIVE, "0: Disable, 1: Enable only for you, 2: Enable for everyone")
+	local function should_sh(ply)
+		local mode = CS_SH_MODE:GetInt()
+		if mode == 1 then
+			return ply == LocalPlayer()
+		elseif mode <= 0 then
+			return false
+		else
+			return true
+		end
+	end
+
 	function cs_player.PlaySoundGroupAsync(ply, sound_group)
 		local finished_task = chatsounds.Tasks.new()
 		if sound_group.Type ~= "group" then
@@ -198,10 +244,21 @@ if CLIENT then
 			local sound_tasks = {}
 			local sounds = flatten_sounds(sound_group)
 			local streams = {}
+			local streams_index = table.insert(cs_player.Streams, streams)
+
+			local function reject(err)
+				table.remove(cs_player.Streams, streams_index)
+				finished_task:reject(err)
+			end
+
+			local function resolve()
+				table.remove(cs_player.Streams, streams_index)
+				finished_task:resolve()
+			end
+
 			for i, sound_data in ipairs(sounds) do
-				if sound_data.Key == "sh" and ply == LocalPlayer() then
-					chatsounds.WebAudio.Panic()
-					streams = {}
+				if sound_data.Key == "sh" and should_sh(ply) then
+					cs_player.StopAllSounds()
 					continue
 				end
 
@@ -248,6 +305,15 @@ if CLIENT then
 
 					local started = false
 					hook.Add("Think", stream, function()
+						if not IsValid(ply) then
+							if not started then
+								sound_task:resolve()
+							end
+
+							hook.Remove("Think", stream)
+							return
+						end
+
 						if not started then
 							stream:SetSourceEntity(ply)
 							stream:Set3D(true)
@@ -279,26 +345,24 @@ if CLIENT then
 						end
 
 						hook.Run("ChatsoundsSoundThink", ply, _sound, stream, sound_data)
+
+						if ply:IsDormant() then
+							stream:SetVolume(0)
+						end
 					end)
 				end
 
 				table.insert(sound_tasks, sound_task)
 			end
 
-			wait_all_tasks_in_order(download_tasks):next(
-				function()
-					if #sound_tasks > 0 then
-						wait_all_tasks_in_order(sound_tasks):next(
-							function() finished_task:resolve() end,
-							function(err) finished_task:reject(err) end
-						)
-					else
-						finished_task:resolve()
-					end
-				end,
-				function(err) finished_task:reject(err) end
-			)
-		end, function(err) finished_task:reject(err) end)
+			wait_all_tasks_in_order(download_tasks):next(function()
+				if #sound_tasks > 0 then
+					wait_all_tasks_in_order(sound_tasks):next(resolve, reject)
+				else
+					resolve()
+				end
+			end, reject)
+		end, reject)
 
 		return finished_task
 	end

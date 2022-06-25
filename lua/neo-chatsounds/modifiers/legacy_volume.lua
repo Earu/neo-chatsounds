@@ -47,7 +47,7 @@ end
 
 function MODIFIER:OnStreamThink(stream)
 	local value = self:GetValue()
-	local f = (SysTime() - self.StartTime) / stream.duration
+	local f = (SysTime() - self.StartTime) / stream.Duration
 	local vol = lerp(f, value[1], value[2]) / 100
 
 	stream:SetVolume(vol)
