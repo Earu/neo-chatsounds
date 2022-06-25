@@ -43,6 +43,8 @@ end
 local function parse_sounds(raw_str, index, ctx)
 	if #ctx.CurrentStr == 0 then return end
 
+	--print("Parsing sounds: " .. ctx.CurrentStr)
+
 	local cur_scope = ctx.Scopes[#ctx.Scopes]
 	if chatsounds.Data.Lookup.List[ctx.CurrentStr] then
 		cur_scope.Sounds = cur_scope.Sounds or {}
@@ -76,13 +78,10 @@ local function parse_sounds(raw_str, index, ctx)
 					if #str_chunk > 0 and chatsounds.Data.Lookup.List[str_chunk] then
 						cur_scope.Sounds = cur_scope.Sounds or {}
 
-						local chunk_index_start, chunk_index_end = str_find(raw_str, str_chunk, index, true)
-						if not chunk_index_start then
-							print("EXCUSE ME")
-							print(str_chunk)
-							print(raw_str)
-							continue
-						end
+						local chunk_index_start, chunk_index_end = str_find(raw_str, str_chunk, ctx.LastParsedSoundEndIndex or index, true)
+						if not chunk_index_start then continue end
+
+						ctx.LastParsedSoundEndIndex = chunk_index_end
 
 						local new_sound = {
 							Key = str_chunk,
@@ -129,6 +128,7 @@ local function parse_sounds(raw_str, index, ctx)
 	-- reset the current string and modifiers
 	ctx.CurrentStr = ""
 	ctx.LastCurrentStrSpaceIndex = -1
+	ctx.LastParsedSoundEndIndex = nil
 end
 
 local MAX_LEGACY_MODIFIER_LEN = 2
@@ -136,6 +136,7 @@ local function parse_legacy_modifiers(raw_str, ctx, index)
 	local found_modifiers = {}
 	local str_chunk = str_explode(SPACE_CHARS_PATTERN, str_trim(ctx.CurrentStr), true)[1]
 	local last_char = str_chunk[1]
+	local has_long_modifier_name = false
 	if modifier_lookup[last_char] then
 		if ctx.LastLegacyModifierChar then
 			if ctx.LastLegacyModifierChar ~= last_char then
@@ -145,10 +146,12 @@ local function parse_legacy_modifiers(raw_str, ctx, index)
 				table_insert(found_modifiers, 1, { Base = modifier_lookup[str_rep(last_char, MAX_LEGACY_MODIFIER_LEN)], StartIndex = index, ArgsStartIndex = 3 })
 			end
 
+			has_long_modifier_name = true
 			ctx.LastLegacyModifierChar = nil
 		else
 			if modifier_lookup[str_rep(last_char, MAX_LEGACY_MODIFIER_LEN)] then
 				ctx.LastLegacyModifierChar = last_char
+				has_long_modifier_name = true
 			else
 				table_insert(found_modifiers, 1, { Base = modifier_lookup[last_char], StartIndex = index, ArgsStartIndex = 2 })
 			end
@@ -177,8 +180,15 @@ local function parse_legacy_modifiers(raw_str, ctx, index)
 	end
 
 	if #found_modifiers > 0 then
+		local missing_char = not has_long_modifier_name and ctx.CurrentStr[1] or ""
 		ctx.CurrentStr = str_trim(str_sub(ctx.CurrentStr, #str_chunk + 1))
+
 		parse_sounds(raw_str, index + #str_chunk + 1, ctx)
+
+		-- restore after parse_sounds
+		if has_long_modifier_name then
+			ctx.CurrentStr = missing_char
+		end
 	end
 end
 
@@ -286,8 +296,7 @@ local scope_handlers = {
 		table_insert(ctx.Modifiers, 1, modifier)
 
 		local space_index = str_find(ctx.CurrentStr, SPACE_CHARS_PATTERN, 1, true)
-		local str_chunk = str_sub(ctx.CurrentStr, 1, space_index and space_index - 1 or #ctx.CurrentStr)
-		ctx.CurrentStr = str_trim(str_chunk)
+		ctx.CurrentStr = space_index and str_trim(str_sub(ctx.CurrentStr, space_index)) or ""
 
 		parse_sounds(raw_str, end_index + 1, ctx)
 
