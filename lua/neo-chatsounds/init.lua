@@ -1,6 +1,8 @@
 local chatsounds = _G.chatsounds or {}
 _G.chatsounds = chatsounds
 
+chatsounds.Debug = false
+
 local NO_METALOG_HEADER_COLOR = Color(100, 100, 255)
 local COLOR_WHITE = Color(255, 255, 255)
 function chatsounds.Log(...)
@@ -15,6 +17,12 @@ function chatsounds.Log(...)
 	end
 
 	metalog.info("neo-chatsounds", CLIENT and "Client" or "Server", ...)
+end
+
+function chatsounds.DebugLog(...)
+	if not chatsounds.Debug then return end
+
+	chatsounds.Log(...)
 end
 
 function chatsounds.Error(err)

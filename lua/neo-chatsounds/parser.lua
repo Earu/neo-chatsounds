@@ -166,7 +166,7 @@ local function parse_legacy_modifiers(raw_str, ctx, index)
 	end
 
 	for _, modifier_data in ipairs(found_modifiers) do
-		local modifier = { Type = "modifier", Name = modifier_data.Base.Name, StartIndex = index }
+		local modifier = { Type = "modifier", Name = modifier_data.Base.Name, StartIndex = has_long_modifier_name and index + 1 or index }
 
 		modifier = setmetatable(modifier, { __index = modifier_data.Base })
 		modifier.IsLegacy = true
