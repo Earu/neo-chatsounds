@@ -40,19 +40,22 @@ if CLIENT then
 		end)
 	end
 
-	function cs_player.GetWantedSound(sound_data)
+	function cs_player.GetWantedSound(sound_data, last_sound)
 		math.randomseed(math.Round(CurTime()))
 
 		local matching_sounds = chatsounds.Data.Lookup.List[sound_data.Key]
 		local index = math.random(1, #matching_sounds)
 		local ret_a, ret_b = hook.Run("ChatsoundsOnSelection", index, matching_sounds)
+		local modified = false
 
 		if isnumber(ret_a) then
 			index = ret_a
+			modified = true
 		end
 
 		if istable(ret_b) then
 			matching_sounds = ret_b
+			modified = true
 		end
 
 		for _, modifier in ipairs(sound_data.Modifiers) do
@@ -61,11 +64,28 @@ if CLIENT then
 
 				if isnumber(ret_a) then
 					index = ret_a
+					modified = true
 				end
 
 				if istable(ret_b) then
 					matching_sounds = ret_b
+					modified = true
 				end
+			end
+		end
+
+		-- match realms together if we can
+		if not modified and last_sound then
+			local matching_realm_sounds = {}
+			for _, snd in ipairs(matching_sounds) do
+				if snd.Realm == last_sound.Realm then
+					table.insert(matching_realm_sounds, snd)
+				end
+			end
+
+			if #matching_realm_sounds > 0 then
+				matching_sounds = matching_realm_sounds
+				index = math.random(1, #matching_sounds)
 			end
 		end
 
@@ -256,13 +276,16 @@ if CLIENT then
 				finished_task:resolve()
 			end
 
+			local last_sound = nil
 			for i, sound_data in ipairs(sounds) do
 				if sound_data.Key == "sh" and should_sh(ply) then
 					cs_player.StopAllSounds()
 					continue
 				end
 
-				local _sound = cs_player.GetWantedSound(sound_data)
+				local _sound = cs_player.GetWantedSound(sound_data, last_sound)
+				last_sound = _sound
+
 				local sound_dir_path = _sound.Path:GetPathFromFilename()
 
 				if not file.Exists(sound_dir_path, "DATA") then
