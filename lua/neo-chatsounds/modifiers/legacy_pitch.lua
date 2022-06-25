@@ -7,7 +7,7 @@ MODIFIER.DefaultValue = { 100, 100 }
 
 function MODIFIER:ParseArgs(args)
 	local str_args = args:Split(".")
-	local pitch_start = math.min(math.max(1, tonumber(str_args[1]) or 100), 255)
+	local pitch_start = math.min(math.max(1, tonumber(str_args[1]) or self.DefaultValue[1]), 255)
 	local pitch_end = math.min(math.max(1, tonumber(str_args[2]) or pitch_start), 255)
 
 	return { pitch_start, pitch_end }
@@ -50,7 +50,7 @@ end
 
 function MODIFIER:OnStreamThink(stream)
 	local value = self:GetValue()
-	local f = (SysTime() - self.StartTime) / self.Duration
+	local f = (SysTime() - self.StartTime) / stream.Duration
 	local pitch = lerp(f, value[1], value[2]) / 100
 
 	stream:SetPlaybackRate(pitch)
