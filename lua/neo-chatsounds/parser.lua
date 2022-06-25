@@ -133,6 +133,8 @@ end
 
 local MAX_LEGACY_MODIFIER_LEN = 2
 local function parse_legacy_modifiers(raw_str, ctx, index)
+	if ctx.InLuaExpression then return end
+
 	local found_modifiers = {}
 	local str_chunk = str_explode(SPACE_CHARS_PATTERN, str_trim(ctx.CurrentStr), true)[1]
 	local last_char = str_chunk[1]
@@ -186,8 +188,9 @@ local function parse_legacy_modifiers(raw_str, ctx, index)
 		parse_sounds(raw_str, index + #str_chunk + 1, ctx)
 
 		-- restore after parse_sounds
-		if has_long_modifier_name then
+		if #missing_char > 0 then
 			ctx.CurrentStr = missing_char
+			--print("applied?")
 		end
 	end
 end
