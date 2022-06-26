@@ -139,6 +139,7 @@ function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 				}
 
 				table.insert(data.Repositories[repo_key].List[sound_key], sound_data)
+				table.sort(data.Repositories[repo_key].List[sound_key], function(a, b) return a.Url < b.Url end)
 			end
 
 			data.CacheRepository(repo, branch, base_path)
@@ -220,6 +221,7 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 				}
 
 				table.insert(data.Repositories[repo_key].List[sound_key], sound_data)
+				table.sort(data.Repositories[repo_key].List[sound_key], function(a, b) return a.Url < b.Url end) -- preserve order of indexes
 			end
 
 			data.CacheRepository(repo, branch, base_path)
