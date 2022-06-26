@@ -69,7 +69,7 @@ if SERVER then
 		net.Start("chatsounds")
 			net.WriteEntity(ply)
 			net.WriteString(text)
-		net.Broadcast()
+		net.SendPAS(ply:WorldSpaceCenter())
 	end
 
 	hook.Add("PlayerSay", "chatsounds.Player", handler)
