@@ -548,6 +548,10 @@ if not concommand.GetTable().chatsounds_recompile_lists then
 end
 
 concommand.Add("chatsounds_recompile_lists", function()
+	data.CompileLists()
+end)
+
+concommand.Add("chatsounds_recompile_lists_full", function()
 	data.CompileLists(true)
 end)
 
