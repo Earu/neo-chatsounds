@@ -4,8 +4,8 @@ if SERVER then
 	util.AddNetworkString("chatsounds")
 	util.AddNetworkString("chatsounds_cmd")
 
-	local SPAM_STEP = 1 -- how many messages can be sent per second after burst
-	local SPAM_MAX = 5 -- max amount of messages per burst
+	local SPAM_STEP = 0.1 -- how many messages can be sent per second after burst
+	local SPAM_MAX = 1 -- max amount of messages per burst
 
 	local spam_watch_lookup = {}
 	local function get_message_cost(msg, is_same_msg)
@@ -14,7 +14,7 @@ if SERVER then
 			return SPAM_MAX - 1
 		else
 			local is_same_msg_spam = is_same_msg and real_msg_len > 128
-			return is_same_msg_spam and 3 or 0
+			return is_same_msg_spam and 1 or 0
 		end
 	end
 
@@ -39,7 +39,7 @@ if SERVER then
 		-- if the computed time is superior to our limit then its spam, rate-limit the player
 		if new_msg_time > time + SPAM_MAX then
 			-- we dont want the rate limit to last forever, clamp the max new time
-			local max_new_time = time + SPAM_MAX + 3
+			local max_new_time = time + SPAM_MAX + 1
 			if new_msg_time > max_new_time then
 				new_msg_time = max_new_time
 			end
