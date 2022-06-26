@@ -230,17 +230,18 @@ if CLIENT then
 		return DEFAULT_OPTS
 	end
 
+	local MAX_ITERATIONS = 100
 	local function flatten_sounds(sound_group, ret)
 		ret = ret or {}
 
 		if sound_group.Sounds then
 			local opts = sound_pre_process(sound_group, true)
-			local iters = opts.DuplicateCount or 1
+			local iters = math.min(MAX_ITERATIONS, opts.DuplicateCount or 1)
 			for _ = 1, iters do
 				for _, sound_data in ipairs(sound_group.Sounds) do
 					chatsounds.Runners.Yield()
 					local snd_opts = sound_pre_process(sound_data, false)
-					local snd_iters = snd_opts.DuplicateCount or 1
+					local snd_iters = math.min(MAX_ITERATIONS, snd_opts.DuplicateCount or 1)
 
 					sound_data.Modifiers = table.Merge(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
 
