@@ -11,7 +11,7 @@ function MODIFIER:ParseArgs(args)
 end
 
 function MODIFIER:OnStreamInit(stream)
-	stream:SetLooping(self:GetValue() ~= '0') 
+	stream:SetLooping(self:GetValue() ~= 0) 
 end
 
 return MODIFIIER
