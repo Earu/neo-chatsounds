@@ -4,7 +4,6 @@ local chatsounds = _G.chatsounds
 local str_explode = _G.string.Explode
 local str_find = _G.string.find
 local str_sub = _G.string.sub
-local str_rep = _G.string.rep
 local str_gsub = _G.string.gsub
 local str_trim = _G.string.Trim
 
@@ -26,6 +25,8 @@ local SPACE_CHARS = {
 }
 
 local modifier_lookup = {}
+local legacy_modifiers = {}
+local rev_legacy_lookup = {}
 for modifier_name, modifier in pairs(chatsounds.Modifiers) do
 	if not modifier.OnlyLegacy then
 		modifier_lookup[modifier_name] = modifier
@@ -36,14 +37,16 @@ for modifier_name, modifier in pairs(chatsounds.Modifiers) do
 		legacy_modifier.DefaultValue = modifier.LegacyDefaultValue or modifier.DefaultValue
 		legacy_modifier.ParseArgs = modifier.LegacyParseArgs or modifier.ParseArgs
 
-		modifier_lookup[modifier.LegacySyntax] = legacy_modifier
+		modifier_lookup["legacy_" .. modifier_name] = legacy_modifier
+		table_insert(legacy_modifiers, modifier.LegacySyntax)
+		rev_legacy_lookup[modifier.LegacySyntax] = "legacy_" .. modifier_name
 	end
 end
 
+table.sort(legacy_modifiers, function(a, b) return b:len() < a:len() end)
+
 local function parse_sounds(raw_str, index, ctx)
 	if #ctx.CurrentStr == 0 then return end
-
-	--print("Parsing sounds: " .. ctx.CurrentStr)
 
 	local cur_scope = ctx.Scopes[#ctx.Scopes]
 	if chatsounds.Data.Lookup.List[ctx.CurrentStr] then
@@ -129,70 +132,6 @@ local function parse_sounds(raw_str, index, ctx)
 	ctx.CurrentStr = ""
 	ctx.LastCurrentStrSpaceIndex = -1
 	ctx.LastParsedSoundEndIndex = nil
-end
-
-local MAX_LEGACY_MODIFIER_LEN = 2
-local function parse_legacy_modifiers(raw_str, ctx, index)
-	if ctx.InLuaExpression then return end
-
-	local found_modifiers = {}
-	local str_chunk = str_explode(SPACE_CHARS_PATTERN, str_trim(ctx.CurrentStr), true)[1]
-	local last_char = str_chunk[1]
-	local has_long_modifier_name = false
-	if modifier_lookup[last_char] then
-		if ctx.LastLegacyModifierChar then
-			if ctx.LastLegacyModifierChar ~= last_char then
-				table_insert(found_modifiers, 1, { Base = modifier_lookup[ctx.LastLegacyModifierChar], StartIndex = index + 1, ArgsStartIndex = 3 })
-				table_insert(found_modifiers, 1, { Base = modifier_lookup[last_char], StartIndex = index, NoArgs = true })
-			else
-				table_insert(found_modifiers, 1, { Base = modifier_lookup[str_rep(last_char, MAX_LEGACY_MODIFIER_LEN)], StartIndex = index, ArgsStartIndex = 3 })
-			end
-
-			has_long_modifier_name = true
-			ctx.LastLegacyModifierChar = nil
-		else
-			if modifier_lookup[str_rep(last_char, MAX_LEGACY_MODIFIER_LEN)] then
-				ctx.LastLegacyModifierChar = last_char
-				has_long_modifier_name = true
-			else
-				table_insert(found_modifiers, 1, { Base = modifier_lookup[last_char], StartIndex = index, ArgsStartIndex = 2 })
-			end
-		end
-	else
-		if ctx.LastLegacyModifierChar then
-			table_insert(found_modifiers, 1, { Base = modifier_lookup[ctx.LastLegacyModifierChar], StartIndex = index + 1, ArgsStartIndex = 3 })
-			ctx.LastLegacyModifierChar = nil
-		end
-	end
-
-	for _, modifier_data in ipairs(found_modifiers) do
-		local modifier = { Type = "modifier", Name = modifier_data.Base.Name, StartIndex = has_long_modifier_name and index + 1 or index }
-
-		modifier = setmetatable(modifier, { __index = modifier_data.Base })
-		modifier.IsLegacy = true
-
-		if modifier_data.NoArgs then
-			modifier.Value = modifier_data.Base.DefaultValue
-		else
-			local str_args = str_sub(str_chunk, modifier_data.ArgsStartIndex)
-			modifier.Value = modifier:ParseArgs(str_args)
-		end
-
-		table_insert(ctx.Modifiers, 1, modifier)
-	end
-
-	if #found_modifiers > 0 then
-		local missing_char = not has_long_modifier_name and ctx.CurrentStr[1] or ""
-		ctx.CurrentStr = str_trim(str_sub(ctx.CurrentStr, #str_chunk + 1))
-
-		parse_sounds(raw_str, index + #str_chunk + 1, ctx)
-
-		-- restore after parse_sounds
-		if #missing_char > 0 then
-			ctx.CurrentStr = missing_char
-			--print("applied?")
-		end
-	end
 end
 
 local scope_handlers = {
@@ -337,6 +276,16 @@ local function parse_str(raw_str)
 		return coroutine.yield(global_scope)
 	end
 
+	-- convert legacy modifiers into new ones
+	for _, legacy_syntax in ipairs(legacy_modifiers) do
+		chatsounds.Runners.Yield()
+
+		local legacy_modifier_name = rev_legacy_lookup[legacy_syntax]
+		raw_str = str_gsub(raw_str, legacy_syntax:PatternSafe() .. "([0-9%.]+)", function(str_args)
+			return (":%s(%s)"):format(legacy_modifier_name, str_args)
+		end)
+	end
+
 	local ctx = {
 		Scopes = { global_scope },
 		InLuaExpression = false,
@@ -358,8 +307,6 @@ local function parse_str(raw_str)
 			if SPACE_CHARS[char] then
 				ctx.LastCurrentStrSpaceIndex = index
 			end
-
-			parse_legacy_modifiers(raw_str, ctx, index)
 		end
 	end
 
