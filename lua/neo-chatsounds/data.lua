@@ -331,9 +331,14 @@ local function merge_repos(rebuild_dynamic_lookup)
 					lookup.List[sound_key] = {}
 				end
 
+				local urls = {}
 				for _, sound_data in pairs(sound_list) do
 					chatsounds.Runners.Yield()
+
+					if urls[sound_data.Url] then continue end
 					table.insert(lookup.List[sound_key], sound_data)
+					urls[sound_data.Url] = true
+
 					update_loading_state()
 				end
 
