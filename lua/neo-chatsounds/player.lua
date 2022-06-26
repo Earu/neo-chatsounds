@@ -119,6 +119,8 @@ if CLIENT then
 		end
 
 		for _, modifier in ipairs(sound_data.Modifiers) do
+			chatsounds.Runners.Yield()
+
 			if modifier.OnSelection then
 				ret_a, ret_b = modifier:OnSelection(index, matching_sounds)
 
@@ -138,6 +140,8 @@ if CLIENT then
 		if not modified and last_sound then
 			local matching_realm_sounds = {}
 			for _, snd in ipairs(matching_sounds) do
+				chatsounds.Runners.Yield()
+
 				if snd.Realm == last_sound.Realm then
 					table.insert(matching_realm_sounds, snd)
 				end
