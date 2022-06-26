@@ -1,14 +1,74 @@
+local STR_NETWORKING_LIMIT = 60000
+
 if SERVER then
 	util.AddNetworkString("chatsounds")
 	util.AddNetworkString("chatsounds_cmd")
 
+	local SPAM_STEP = 1 -- how many messages can be sent per second after burst
+	local SPAM_MAX = 5 -- max amount of messages per burst
+
+	local spam_watch_lookup = {}
+	local function get_message_cost(msg, is_same_msg)
+		local _, real_msg_len = msg:gsub("[^\128-\193]", "")
+		if real_msg_len > 1024 then
+			return SPAM_MAX - 1
+		else
+			local is_same_msg_spam = is_same_msg and real_msg_len > 128
+			return is_same_msg_spam and 3 or 0
+		end
+	end
+
+	local function spam_watch(ply, msg)
+		if ply:IsAdmin() then return false end
+
+		local time = RealTime()
+		local last_msg = spam_watch_lookup[ply] or { Time = 0, Message = "" }
+
+		-- if the last_msg.Time is inferior to current time it means the player is not
+		-- being rate-limited (spamming) update its time to the current one
+		if last_msg.Time < time then
+			last_msg.Time = time
+		end
+
+		local is_same_msg = last_msg.Message == msg
+		last_msg.Message = msg
+
+		-- compute what time is appropriate for the current message
+		local new_msg_time = last_msg.Time + SPAM_STEP + get_message_cost(msg, is_same_msg)
+
+		-- if the computed time is superior to our limit then its spam, rate-limit the player
+		if new_msg_time > time + SPAM_MAX then
+			-- we dont want the rate limit to last forever, clamp the max new time
+			local max_new_time = time + SPAM_MAX + 3
+			if new_msg_time > max_new_time then
+				new_msg_time = max_new_time
+			end
+
+			spam_watch_lookup[ply] = { Time = new_msg_time, Message = msg }
+			return true
+		end
+
+		spam_watch_lookup[ply] = { Time = new_msg_time, Message = msg }
+		return false
+	end
+
 	local function handler(ply, text)
+		if #text >= STR_NETWORKING_LIMIT then
+			chatsounds.Error("Message too long: " .. #text .. "chars by " .. ply:Nick())
+			return
+		end
+
+		if spam_watch(ply, text) then
+			chatsounds.Error("Message spammer: " .. ply:Nick())
+			return
+		end
+
 		local ret = hook.Run("ChatsoundsShouldNetwork", ply, text)
 		if ret == false then return end
 
 		net.Start("chatsounds")
 			net.WriteEntity(ply)
-			net.WriteString(text:sub(1, 60000))
+			net.WriteString(text)
 		net.Broadcast()
 	end
 
@@ -102,7 +162,6 @@ if CLIENT then
 
 		local function next_task()
 			local task = tasks[i]
-
 			if not task then
 				finished_task:resolve()
 				return
@@ -149,27 +208,27 @@ if CLIENT then
 	local DEFAULT_OPTS = {
 		DuplicateCount = 1,
 	}
+
 	local function sound_pre_process(grp, is_group)
 		if not grp.Modifiers then return DEFAULT_OPTS end
 
 		local opts = table.Copy(DEFAULT_OPTS)
 		for _, modifier in ipairs(grp.Modifiers) do
 			chatsounds.Runners.Yield()
+
 			if is_group then
 				if modifier.OnGroupPreProcess then
 					return modifier:OnGroupPreProcess(grp, opts) or DEFAULT_OPTS
 				end
 			else
 				if modifier.OnSoundPreProcess then
-					local ret = modifier:OnSoundPreProcess(grp, opts) or DEFAULT_OPTS
-					return ret
+					return modifier:OnSoundPreProcess(grp, opts) or DEFAULT_OPTS
 				end
 			end
 		end
 
 		return DEFAULT_OPTS
 	end
-
 
 	local function flatten_sounds(sound_group, ret)
 		ret = ret or {}
@@ -180,10 +239,11 @@ if CLIENT then
 			for _ = 1, iters do
 				for _, sound_data in ipairs(sound_group.Sounds) do
 					chatsounds.Runners.Yield()
-
 					local snd_opts = sound_pre_process(sound_data, false)
 					local snd_iters = snd_opts.DuplicateCount or 1
+
 					sound_data.Modifiers = table.Merge(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
+
 					for _ = 1, snd_iters do
 						table.insert(ret, sound_data)
 					end
@@ -196,9 +256,7 @@ if CLIENT then
 			flatten_sounds(child_group, ret)
 		end
 
-		table.sort(ret, function(a, b)
-			return a.StartIndex < b.StartIndex
-		end)
+		table.sort(ret, function(a, b) return a.StartIndex < b.StartIndex end)
 
 		return ret
 	end
@@ -436,7 +494,7 @@ if CLIENT then
 		if ply ~= LocalPlayer() then return end
 
 		net.Start("chatsounds_cmd")
-			net.WriteString(text:sub(1, 60000))
+			net.WriteString(text:sub(1, STR_NETWORKING_LIMIT))
 		net.SendToServer()
 	end
 
