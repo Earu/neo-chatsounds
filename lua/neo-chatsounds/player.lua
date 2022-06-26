@@ -267,7 +267,7 @@ if CLIENT then
 		timer.Simple(2, function()
 			if not stream:IsReady() then
 				hook.Remove("Think", stream)
-				task:reject(("WebAudio Timeout %s"):format(snd.Url))
+				task:reject(("WebAudio Timeout %s\nIf this happens a lot please do chatsounds_reload!"):format(snd.Url))
 			end
 		end)
 
