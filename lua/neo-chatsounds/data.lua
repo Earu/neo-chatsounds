@@ -352,6 +352,90 @@ local function merge_repos(rebuild_dynamic_lookup)
 	end)
 end
 
+local function prepare_default_config()
+	local default_config = {}
+	local valve_folders = { "csgo", "css", "ep1", "ep2", "hl1", "hl2", "l4d", "l4d2", "portal", "tf2" }
+	for _, valve_folder in ipairs(valve_folders) do
+		table.insert(default_config, {
+			Repo = "PAC3-Server/chatsounds-valve-games",
+			Branch = "master",
+			BasePath = valve_folder,
+			UseMsgPack = true,
+		})
+	end
+
+	return default_config, SERVER and chatsounds.Json.encode(default_config) or nil
+end
+
+if SERVER then
+	util.AddNetworkString("chatsounds_repos")
+
+	local default_config, default_json = prepare_default_config()
+	data.RepoConfig = default_config
+	data.RepoConfigJson = default_json
+
+	local STR_NETWORKING_LIMIT = 60000
+	local function load_custom_config()
+		if not file.Exists("chatsounds/repo_config.json", "DATA") then
+			file.CreateDir("chatsounds")
+
+			local default_config, default_json = prepare_default_config()
+			file.Write("chatsounds/repo_config.json", default_json)
+
+			return default_config, default_json
+		end
+
+		local custom_json = file.Read("chatsounds/repo_config.json", "DATA") or ""
+		if #custom_json > STR_NETWORKING_LIMIT then
+			chatsounds.Error("Failed to load repo_config.json: Your config file is too big!")
+			return prepare_default_config()
+		end
+
+		local success, err = pcall(chatsounds.Json.decode, custom_json)
+		if not success then
+			chatsounds.Error("Failed to load repo_config.json: " .. err)
+			return prepare_default_config()
+		end
+
+		return err, custom_json
+	end
+
+	hook.Add("Initialize", "chatsounds.Data", function()
+		local custom_config, custom_json = load_custom_config()
+		data.RepoConfig = custom_config
+		data.RepoConfigJson = custom_json
+		data.CompileLists()
+	end)
+
+	-- hack to know when we are able to broadcast the config to clients
+	hook.Add("PlayerInitialSpawn", "chatsounds.Data.PlayerFullLoad", function(ply)
+		hook.Add("SetupMove", ply, function(self, ply, _, cmd)
+			if self == ply and not cmd:IsForced() then
+				hook.Run("PlayerFullLoad", self)
+				hook.Remove("SetupMove", self)
+			end
+		end )
+	end )
+
+	hook.Add("PlayerFullLoad", "chatsounds.Data.Config", function(ply)
+		net.Start("chatsounds_repos")
+			net.WriteString(data.RepoConfigJson)
+		net.Send(ply)
+	end)
+end
+
+if CLIENT then
+	data.RepoConfig = prepare_default_config()
+
+	net.Receive("chatsounds_repos", function()
+		chatsounds.Log("Received server repo config!")
+
+		local json = net.ReadString()
+		data.RepoConfig = chatsounds.Json.decode(json)
+		data.CompileLists()
+	end)
+end
+
 function data.CompileLists(force_recompile)
 	data.Loading = {
 		Current = 0,
@@ -360,7 +444,26 @@ function data.CompileLists(force_recompile)
 		DisplayPerc = true,
 	}
 
-	chatsounds.Tasks.all({
+	local repo_tasks = {}
+	for _, repo_data in ipairs(data.RepoConfig) do
+		if repo_data.UseMsgPack then
+			table.insert(repo_tasks, data.BuildFromGitHubMsgPack(
+				repo_data.Repo,
+				repo_data.Branch,
+				repo_data.BasePath,
+				force_recompile
+			))
+		else
+			table.insert(repo_tasks, data.BuildFromGithub(
+				repo_data.Repo,
+				repo_data.Branch,
+				repo_data.BasePath,
+				force_recompile
+			))
+		end
+	end
+
+	--[[
 		data.BuildFromGithub("Metastruct/garrysmod-chatsounds", "master", "sound/chatsounds/autoadd", force_recompile),
 		data.BuildFromGithub("PAC3-Server/chatsounds", "master", "sounds/chatsounds", force_recompile),
 
@@ -374,7 +477,9 @@ function data.CompileLists(force_recompile)
 		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "l4d2", force_recompile),
 		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "portal", force_recompile),
 		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "tf2", force_recompile),
-	}):next(function(results)
+	]]--
+
+	chatsounds.Tasks.all(repo_tasks):next(function(results)
 		local rebuild_dynamic_lookup = force_recompile
 		if not force_recompile then
 			for _, recompiled in ipairs(results) do
@@ -417,10 +522,6 @@ end
 
 concommand.Add("chatsounds_recompile_lists", function()
 	data.CompileLists(true)
-end)
-
-hook.Add("InitPostEntity", "chatsounds.Data", function()
-	data.CompileLists()
 end)
 
 if CLIENT then
