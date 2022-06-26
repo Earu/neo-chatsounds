@@ -267,7 +267,7 @@ if CLIENT then
 		timer.Simple(2, function()
 			if not stream:IsReady() then
 				hook.Remove("Think", stream)
-				task:reject(("Failed to stream %s"):format(snd.Url))
+				task:reject(("Timeout %s"):format(snd.Url))
 			end
 		end)
 
