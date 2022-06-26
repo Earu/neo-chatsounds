@@ -478,17 +478,7 @@ function data.CompileLists(force_recompile)
 		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "tf2", force_recompile),
 	]]--
 
-	chatsounds.Tasks.all(repo_tasks):next(function(results)
-		local rebuild_dynamic_lookup = force_recompile
-		if not force_recompile then
-			for _, recompiled in ipairs(results) do
-				if recompiled then
-					rebuild_dynamic_lookup = true
-					break
-				end
-			end
-		end
-
+	local function process_repos(rebuild_dynamic_lookup)
 		data.Loading.Current = 0
 		data.Loading.Text = "Merging chatsounds repositories... %d%%"
 
@@ -501,12 +491,45 @@ function data.CompileLists(force_recompile)
 			chatsounds.Error(err)
 			hook.Run("ChatsoundsInitialized")
 		end)
+	end
+
+	local time_in_secs = 0
+	timer.Create("chatsounds_repos", 1, 0, function()
+		if not data.Loading then
+			timer.Remove("chatsounds_repos")
+			return
+		end
+
+		if data.Loading.Target <= data.Loading.Current then
+			process_repos(false)
+			timer.Remove("chatsounds_repos")
+		end
+
+		time_in_secs = time_in_secs + 1
+		if time_in_secs >= 60 * 5 then
+			process_repos(false)
+			timer.Remove("chatsounds_repos")
+		end
+	end)
+
+	chatsounds.Tasks.all(repo_tasks):next(function(results)
+		local rebuild_dynamic_lookup = force_recompile
+		if not force_recompile then
+			for _, recompiled in ipairs(results) do
+				if recompiled then
+					rebuild_dynamic_lookup = true
+					break
+				end
+			end
+		end
+
+		process_repos(rebuild_dynamic_lookup)
 	end, function(errors)
-		data.Loading = nil
-		for _, err in pairs(errors) do
+		for _, err in ipairs(errors) do
 			chatsounds.Error(err)
 		end
-		hook.Run("ChatsoundsInitialized")
+
+		process_repos(false)
 	end)
 end
 
