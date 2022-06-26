@@ -16,6 +16,10 @@ function MODIFIER:GetValue()
 	return self.Value
 end
 
+function MODIFIER:OnStreamInit(stream)
+	stream.Duration = stream.Duration - (stream.Duration * self:GetValue())
+end
+
 function MODIFIER:OnStreamThink(stream)
 	if not self.StreamStarted then
 		self.StreamStarted = true
