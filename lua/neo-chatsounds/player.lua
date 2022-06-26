@@ -224,7 +224,9 @@ if CLIENT then
 	end
 
 	cs_player.Streams = {}
-	function cs_player.StopAllSounds()
+
+	local ignore_next_stop_sound = false
+	function cs_player.StopAllSounds(run_stop_sound)
 		for _, streams in pairs(cs_player.Streams) do
 			for k, stream in pairs(streams) do
 				stream:Remove()
@@ -233,10 +235,20 @@ if CLIENT then
 		end
 
 		chatsounds.WebAudio.Panic()
+
+		if run_stop_sound then
+			ignore_next_stop_sound = true
+			RunConsoleCommand("stopsound")
+		end
 	end
 
 	hook.Add("StopSound", "chatsounds.Player.StopSound", function()
-		cs_player.StopAllSounds()
+		if ignore_next_stop_sound then
+			ignore_next_stop_sound = false
+			return
+		end
+
+		cs_player.StopAllSounds(false)
 		chatsounds.Log("Cleared all sounds!")
 	end)
 
@@ -279,7 +291,7 @@ if CLIENT then
 			local last_sound = nil
 			for i, sound_data in ipairs(sounds) do
 				if sound_data.Key == "sh" and should_sh(ply) then
-					cs_player.StopAllSounds()
+					cs_player.StopAllSounds(true)
 					continue
 				end
 
