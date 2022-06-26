@@ -574,7 +574,7 @@ if CLIENT then
 		local chat_x, chat_y = chat.GetChatBoxPos()
 		local _, chat_h = chat.GetChatBoxSize()
 		if data.Loading.DisplayPerc then
-			local text = (data.Loading.Text):format(math.min(100, math.Round((data.Loading.Current / data.Loading.Target) * 100)))
+			local text = (data.Loading.Text):format(math.max(0, math.min(100, math.Round((data.Loading.Current / data.Loading.Target) * 100))))
 			draw_shadowed_text(text, chat_x, chat_y + chat_h + 5, 255, 255, 255, 255)
 		else
 			draw_shadowed_text(data.Loading.Text, chat_x, chat_y + chat_h + 5, 255, 255, 255, 255)
