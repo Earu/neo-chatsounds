@@ -370,10 +370,6 @@ end
 if SERVER then
 	util.AddNetworkString("chatsounds_repos")
 
-	local default_config, default_json = prepare_default_config()
-	data.RepoConfig = default_config
-	data.RepoConfigJson = default_json
-
 	local STR_NETWORKING_LIMIT = 60000
 	local function load_custom_config()
 		if not file.Exists("chatsounds/repo_config.json", "DATA") then
@@ -400,10 +396,11 @@ if SERVER then
 		return err, custom_json
 	end
 
+	local custom_config, custom_json = load_custom_config()
+	data.RepoConfig = custom_config
+	data.RepoConfigJson = custom_json
+
 	hook.Add("Initialize", "chatsounds.Data", function()
-		local custom_config, custom_json = load_custom_config()
-		data.RepoConfig = custom_config
-		data.RepoConfigJson = custom_json
 		data.CompileLists()
 	end)
 
@@ -414,8 +411,8 @@ if SERVER then
 				hook.Run("PlayerFullLoad", self)
 				hook.Remove("SetupMove", self)
 			end
-		end )
-	end )
+		end)
+	end)
 
 	hook.Add("PlayerFullLoad", "chatsounds.Data.Config", function(ply)
 		net.Start("chatsounds_repos")
