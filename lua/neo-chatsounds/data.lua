@@ -684,7 +684,10 @@ if CLIENT then
 		end
 
 		table.sort(suggestions, function(a, b)
-			return a:byte() < b:byte()
+			if #a ~= #b then
+				return #a < #b
+			end
+			return a < b
 		end)
 
 		data.SuggestionsIndex = -1
