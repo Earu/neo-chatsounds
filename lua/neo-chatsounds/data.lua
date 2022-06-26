@@ -30,7 +30,7 @@ local function update_loading_state()
 	if data.Loading then
 		data.Loading.Current = data.Loading.Current + 1
 
-		local cur_perc = math.max(0, math.min(100, math.Round((data.Loading.Current / data.Loading.Target) * 100)))
+		local cur_perc = math.max(0, math.min(100, math.Round((data.Loading.Current / math.max(1, data.Loading.Target)) * 100)))
 		if cur_perc % 10 == 0 and cur_perc ~= data.Loading.LastLoggedPercent and (CLIENT or (SERVER and game.IsDedicated())) then
 			data.Loading.LastLoggedPercent = cur_perc
 			chatsounds.Log((data.Loading.Text):format(cur_perc))
