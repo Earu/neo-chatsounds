@@ -7,7 +7,7 @@
 - [ ] Legacy modifiers assigned incorrectly, and arguments too, seems to have to do with waiting for a second char in the parser
 
 ## Suggestions
-- [ ] Ability to load in any sound repository you want?
+- [x] Ability to load in any sound repository you want? (can be done by server owners with chatsounds/repo_config.json)
 - [ ] Proper realm/sound blocking features?
 - [ ] Stacking modifiers ? e.g world--50--50 becomes --25 internally?
 - [ ] Completion that completes your currently typed modifier
