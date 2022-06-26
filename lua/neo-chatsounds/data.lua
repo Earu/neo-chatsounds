@@ -422,7 +422,7 @@ if SERVER then
 end
 
 if CLIENT then
-	data.RepoConfig = prepare_default_config()
+	data.RepoConfig = data.RepoConfig or prepare_default_config()
 
 	net.Receive("chatsounds_repos", function()
 		chatsounds.Log("Received server repo config!")
