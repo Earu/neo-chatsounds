@@ -10,6 +10,11 @@ function MODIFIER:ParseArgs(args)
 	return math.max(0, n)
 end
 
+function MODIFIER:GetValue()
+	if not self.Value or isfunction(self.ExpressionFn) then return self.DefaultValue end
+	return self.Value
+end
+
 function MODIFIER:OnStreamInit(stream)
 	stream:SetLooping(self:GetValue() ~= 0)
 end
