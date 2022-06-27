@@ -542,7 +542,7 @@ if not concommand.GetTable().chatsounds_recompile_lists then
 	data.Loading = {
 		Current = -1,
 		Target = -1,
-		Text = "Initialising chatsounds...",
+		Text = "Initializing chatsounds...",
 		DisplayPerc = false,
 	}
 end
