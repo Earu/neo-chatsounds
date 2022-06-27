@@ -19,12 +19,23 @@ You have multiple options here:
 ## How do I add sounds?
 Typically you can either add sounds in [this repo](https://github.com/Metastruct/garrysmod-chatsounds) or in [this one](https://github.com/PAC3-Server/chatsounds). Each of them are maintained by different people but the rules for adding a sound are the same.
 
-**`Do check their readme.md!`**
+- Note 1: **`Do check their readme.md!`**
+- Note 2: **`These need to be added to repo_config.json they are not included by default!`**
 
 ## How do I add more sound sources/repos?
 If you go in `garrysmod/data/chatsounds` you should find a file called **`repo_config.json`**. Open it and add the repositories you want to the config following the existing format. **In most cases you should keep `UseMsgPack` to `false`**, unless you do actually use .msgpack files. For now the only repos/sources supported are GitHub repositories.
 
-*Disclaimer: By default the config only loads the valve sound repos*
+*Disclaimer: By default the config only loads the valve sound repos.*
+
+Example for [this repo](https://github.com/PAC3-Server/chatsounds):
+```json
+{
+	"Repo": " PAC3-Server/chatsounds",
+	"Branch": "master",
+	"BasePath": "sounds/chatsounds",
+	"UseMsgPack": false,
+}
+```
 
 ## Modifiers ?
 Modifiers are a big part of chatsounds, they allow you to transform sounds and make them into something else. [Some people even made songs with them!](https://soundcloud.com/capsadmin).
