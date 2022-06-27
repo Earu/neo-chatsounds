@@ -688,7 +688,6 @@ if CLIENT then
 						appendComma = not isEmpty and appendComma
 						currentAmount = currentAmount + (isEmpty and 0 or 1)
 					end
-					print(appendComma, currentAmount)
 
 					for i, value in ipairs(mod.DefaultValue) do
 						local comma = appendComma and i == currentAmount + 1
