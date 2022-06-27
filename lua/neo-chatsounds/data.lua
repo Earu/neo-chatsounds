@@ -651,12 +651,65 @@ if CLIENT then
 			return
 		end
 
+		local suggestions = {}
+		local added_suggestions = {}
+
 		local search_words = text:Split(" ")
 		local last_word = search_words[#search_words]
 
+		local MODIFIER_PATTERN = ":([%w_]+)[%[%]%(%w%s,%.]*$"
+		local modifier = text:match(MODIFIER_PATTERN)
+		local arguments = text:match(":[%w_]+%(([%[%]%w%s,%.]*)$")
+		if modifier then
+			local withoutModifier = text:gsub(MODIFIER_PATTERN, "")
+			if not arguments then
+				for name, _ in pairs(chatsounds.Modifiers) do
+					if not name:StartWith(modifier) or added_suggestions[name] then continue end
+
+					suggestions[#suggestions + 1] = withoutModifier .. ":" .. name
+					added_suggestions[name] = true
+				end
+			else
+				local mod = chatsounds.Modifiers[modifier]
+				if not mod then
+					data.SuggestionsIndex = -1
+					data.Suggestions = suggestions
+					return
+				end
+
+				local suggestArguments = arguments
+
+				if type(mod.DefaultValue) == "table" then
+					local types = {}
+					local currentAmount = 0
+					local appendComma = true
+					for _, v in ipairs(arguments:Split(",")) do
+						local isEmpty = v:Trim():len() == 0
+						appendComma = not isEmpty and appendComma
+						currentAmount = currentAmount + (isEmpty and 0 or 1)
+					end
+					print(appendComma, currentAmount)
+
+					for i, value in ipairs(mod.DefaultValue) do
+						local comma = appendComma and i == currentAmount + 1
+						types[math.max(i - currentAmount, 1)] = (comma and ", " or "") .. "[" .. type(value) .. "]"
+					end
+
+					suggestArguments = suggestArguments .. table.concat(types, ", "):sub(1, -1)
+				else
+					suggestArguments = suggestArguments ..
+						"[" .. type(mod.DefaultValue) .. "]"
+				end
+
+				suggestions[#suggestions + 1] = withoutModifier .. ":" .. modifier .. "(" .. suggestArguments .. ")"
+			end
+
+			data.SuggestionsIndex = -1
+			data.Suggestions = suggestions
+			return
+		end
+
 		local sounds = {}
-		local suggestions = {}
-		local added_suggestions = {}
 		local node = data.Lookup.Dynamic[last_word[1]]
 		if node then
 			if node.__depth then
