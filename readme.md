@@ -21,6 +21,11 @@ Typically you can either add sounds in [this repo](https://github.com/Metastruct
 
 **`Do check their readme.md!`**
 
+## How do I add more sound sources/repos?
+If you go in `garrysmod/data/chatsounds` you should find a file called **`repo_config.json`**. Open it and add the repositories you want to the config following the existing format. **In most cases you should keep `UseMsgPack` to `false`**, unless you do actually use .msgpack files. For now the only repos/sources supported are GitHub repositories.
+
+*Disclaimer: By default the config only loads the valve sound repos*
+
 ## Modifiers ?
 Modifiers are a big part of chatsounds, they allow you to transform sounds and make them into something else. [Some people even made songs with them!](https://soundcloud.com/capsadmin).
 
