@@ -416,6 +416,7 @@ if CLIENT then
 							stream:SetSourceEntity(ply)
 							stream:Set3D(true)
 							stream.Duration = stream:GetLength()
+							stream.Overlap = true
 
 							for _, modifier in ipairs(sound_data.Modifiers) do
 								if modifier.OnStreamInit then
