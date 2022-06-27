@@ -661,12 +661,12 @@ if CLIENT then
 		local modifier = text:match(MODIFIER_PATTERN)
 		local arguments = text:match(":[%w_]+%(([%[%]%w%s,%.]*)$")
 		if modifier then
-			local withoutModifier = text:gsub(MODIFIER_PATTERN, "")
+			local without_modifier = text:gsub(MODIFIER_PATTERN, "")
 			if not arguments then
 				for name, _ in pairs(chatsounds.Modifiers) do
 					if not name:StartWith(modifier) or added_suggestions[name] then continue end
 
-					suggestions[#suggestions + 1] = withoutModifier .. ":" .. name
+					suggestions[#suggestions + 1] = without_modifier .. ":" .. name
 					added_suggestions[name] = true
 				end
 			else
@@ -677,30 +677,30 @@ if CLIENT then
 					return
 				end
 
-				local suggestArguments = arguments
+				local suggest_arguments = arguments
 
 				if type(mod.DefaultValue) == "table" then
 					local types = {}
-					local currentAmount = 0
-					local appendComma = true
+					local current_amount = 0
+					local append_comma = true
 					for _, v in ipairs(arguments:Split(",")) do
-						local isEmpty = v:Trim():len() == 0
-						appendComma = not isEmpty and appendComma
-						currentAmount = currentAmount + (isEmpty and 0 or 1)
+						local is_empty = v:Trim():len() == 0
+						append_comma = not is_empty and append_comma
+						current_amount = current_amount + (is_empty and 0 or 1)
 					end
 
 					for i, value in ipairs(mod.DefaultValue) do
-						local comma = appendComma and i == currentAmount + 1
-						types[math.max(i - currentAmount, 1)] = (comma and ", " or "") .. "[" .. type(value) .. "]"
+						local comma = append_comma and i == current_amount + 1
+						types[math.max(i - current_amount, 1)] = (comma and ", " or "") .. "[" .. type(value) .. "]"
 					end
 
-					suggestArguments = suggestArguments .. table.concat(types, ", "):sub(1, -1)
+					suggest_arguments = suggest_arguments .. table.concat(types, ", "):sub(1, -1)
 				else
-					suggestArguments = suggestArguments ..
+					suggest_arguments = suggest_arguments ..
 						"[" .. type(mod.DefaultValue) .. "]"
 				end
 
-				suggestions[#suggestions + 1] = withoutModifier .. ":" .. modifier .. "(" .. suggestArguments .. ")"
+				suggestions[#suggestions + 1] = without_modifier .. ":" .. modifier .. "(" .. suggest_arguments .. ")"
 			end
 
 			data.SuggestionsIndex = -1
