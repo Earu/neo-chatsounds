@@ -16,7 +16,7 @@ function MODIFIER:GetValue()
 end
 
 function MODIFIER:OnStreamInit(stream)
-	stream:SetLooping(self:GetValue() ~= 0)
+	stream:SetMaxLoopCount(self:GetValue() ~= 0)
 end
 
 return MODIFIER
