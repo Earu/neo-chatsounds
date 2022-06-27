@@ -3,6 +3,7 @@ local MODIFIER = {}
 MODIFIER.Name = "repeat"
 MODIFIER.LegacySyntax = "*"
 MODIFIER.DefaultValue = 1
+MODIFIER.NoInheritance = true
 
 function MODIFIER:ParseArgs(args)
 	local rep = tonumber(args)
