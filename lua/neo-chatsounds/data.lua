@@ -678,12 +678,13 @@ if CLIENT then
 				end
 
 				local suggest_arguments = arguments
+				local split_args = arguments:Split(",")
 
 				if type(mod.DefaultValue) == "table" then
 					local types = {}
 					local current_amount = 0
 					local append_comma = true
-					for _, v in ipairs(arguments:Split(",")) do
+					for _, v in ipairs(split_args) do
 						local is_empty = v:Trim():len() == 0
 						append_comma = not is_empty and append_comma
 						current_amount = current_amount + (is_empty and 0 or 1)
@@ -694,8 +695,10 @@ if CLIENT then
 						types[math.max(i - current_amount, 1)] = (comma and ", " or "") .. "[" .. type(value) .. "]"
 					end
 
-					suggest_arguments = suggest_arguments .. table.concat(types, ", "):sub(1, -1)
-				else
+					if #mod.DefaultValue ~= current_amount then
+						suggest_arguments = suggest_arguments .. table.concat(types, ", "):sub(1, -1)
+					end
+				elseif split_args[1]:Trim():len() == 0 then
 					suggest_arguments = suggest_arguments ..
 						"[" .. type(mod.DefaultValue) .. "]"
 				end
