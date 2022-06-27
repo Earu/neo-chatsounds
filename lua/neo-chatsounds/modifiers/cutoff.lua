@@ -25,6 +25,7 @@ end
 
 function MODIFIER:OnStreamInit(stream)
 	stream.Duration = stream.Duration * (self:GetValue() / 100)
+	stream.Overlap = false
 end
 
 return MODIFIER
