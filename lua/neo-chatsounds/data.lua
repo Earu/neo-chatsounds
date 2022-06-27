@@ -542,7 +542,7 @@ if not concommand.GetTable().chatsounds_recompile_lists then
 	data.Loading = {
 		Current = -1,
 		Target = -1,
-		Text = "Initialising chatsounds...",
+		Text = "Initializing chatsounds...",
 		DisplayPerc = false,
 	}
 end
@@ -651,12 +651,64 @@ if CLIENT then
 			return
 		end
 
+		local suggestions = {}
+		local added_suggestions = {}
+
 		local search_words = text:Split(" ")
 		local last_word = search_words[#search_words]
 
+		local MODIFIER_PATTERN = ":([%w_]+)[%[%]%(%w%s,%.]*$"
+		local modifier = text:match(MODIFIER_PATTERN)
+		local arguments = text:match(":[%w_]+%(([%[%]%w%s,%.]*)$")
+		if modifier then
+			local without_modifier = text:gsub(MODIFIER_PATTERN, "")
+			if not arguments then
+				for name, _ in pairs(chatsounds.Modifiers) do
+					if not name:StartWith(modifier) or added_suggestions[name] then continue end
+
+					suggestions[#suggestions + 1] = without_modifier .. ":" .. name
+					added_suggestions[name] = true
+				end
+			else
+				local mod = chatsounds.Modifiers[modifier]
+				if not mod then
+					data.SuggestionsIndex = -1
+					data.Suggestions = suggestions
+					return
+				end
+
+				local suggest_arguments = arguments
+
+				if type(mod.DefaultValue) == "table" then
+					local types = {}
+					local current_amount = 0
+					local append_comma = true
+					for _, v in ipairs(arguments:Split(",")) do
+						local is_empty = v:Trim():len() == 0
+						append_comma = not is_empty and append_comma
+						current_amount = current_amount + (is_empty and 0 or 1)
+					end
+
+					for i, value in ipairs(mod.DefaultValue) do
+						local comma = append_comma and i == current_amount + 1
+						types[math.max(i - current_amount, 1)] = (comma and ", " or "") .. "[" .. type(value) .. "]"
+					end
+
+					suggest_arguments = suggest_arguments .. table.concat(types, ", "):sub(1, -1)
+				else
+					suggest_arguments = suggest_arguments ..
+						"[" .. type(mod.DefaultValue) .. "]"
+				end
+
+				suggestions[#suggestions + 1] = without_modifier .. ":" .. modifier .. "(" .. suggest_arguments .. ")"
+			end
+
+			data.SuggestionsIndex = -1
+			data.Suggestions = suggestions
+			return
+		end
+
 		local sounds = {}
-		local suggestions = {}
-		local added_suggestions = {}
 		local node = data.Lookup.Dynamic[last_word[1]]
 		if node then
 			if node.__depth then
