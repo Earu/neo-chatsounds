@@ -433,6 +433,14 @@ if CLIENT then
 							stream.Duration = stream:GetLength()
 							stream.Overlap = true
 
+							local function remove_stream()
+								if IsValid(stream) then
+									stream:Remove()
+								end
+
+								hook.Remove("Think", stream)
+							end
+
 							for _, modifier in ipairs(sound_data.Modifiers) do
 								if modifier.OnStreamInit then
 									modifier:OnStreamInit(stream)
@@ -441,11 +449,15 @@ if CLIENT then
 
 							timer.Simple(stream.Duration, function()
 								if not stream.Overlap then
-									stream:Remove()
+									remove_stream()
 								end
 
 								sound_task:resolve()
 							end)
+
+							if stream.Overlap then
+								timer.Simple(stream:GetLength() + 1, remove_stream)
+							end
 
 							stream:Play()
 							started = true
