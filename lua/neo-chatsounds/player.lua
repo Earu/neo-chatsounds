@@ -197,7 +197,10 @@ if CLIENT then
 		if sound_group.Modifiers then
 			for _, modifier in ipairs(sound_group.Modifiers) do
 				chatsounds.Runners.Yield()
-				table.insert(ret, modifier)
+
+				if not modifier.NoInheritance then
+					table.insert(ret, modifier)
+				end
 			end
 		end
 
@@ -239,44 +242,41 @@ if CLIENT then
 		ret = ret or {}
 		total_iters = total_iters or 0
 
-		if sound_group.Sounds then
-			local opts = sound_pre_process(sound_group, true)
-			local iters = math.min(MAX_ITERATIONS, opts.DuplicateCount or 1)
-
+		local function add_iters(input)
+			local iters = math.min(MAX_ITERATIONS, input or 1)
 			if total_iters + iters > MAX_ITERATIONS then
 				iters = 1
 			end
 
 			total_iters = total_iters + iters
+			return iters
+		end
 
-			for i = 1, iters do
-				for _, sound_data in ipairs(sound_group.Sounds) do
+		local data_chunks = table.Add(sound_group.Sounds or {}, sound_group.Children)
+		table.sort(data_chunks, function(a, b) return a.StartIndex < b.StartIndex end)
+
+		for _, data_chunk in ipairs(data_chunks) do
+			chatsounds.Runners.Yield()
+
+			if data_chunk.Type == "sound" then
+				local snd_opts = sound_pre_process(data_chunk, false)
+				local snd_iters = add_iters(snd_opts.DuplicateCount)
+				for _ = 1, snd_iters do
 					chatsounds.Runners.Yield()
-					local snd_opts = sound_pre_process(sound_data, false)
 
-					local snd_iters = math.min(MAX_ITERATIONS, snd_opts.DuplicateCount or 1)
-					if total_iters + snd_iters > MAX_ITERATIONS then
-						snd_iters = 1
-					end
+					data_chunk.Modifiers = table.Add(data_chunk.Modifiers, get_all_modifiers(data_chunk.ParentScope))
+					table.insert(ret, data_chunk)
+				end
+			elseif data_chunk.Type == "group" then
+				local opts = sound_pre_process(data_chunk, true)
+				local iters = add_iters(opts.DuplicateCount)
+				for _ = 1, iters do
+					chatsounds.Runners.Yield()
 
-					total_iters = total_iters + snd_iters
-
-					sound_data.Modifiers = table.Add(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
-
-					for _ = 1, snd_iters do
-						chatsounds.Runners.Yield()
-						table.insert(ret, sound_data)
-					end
+					flatten_sounds(data_chunk, ret, total_iters)
 				end
 			end
 		end
-
-		for _, child_group in ipairs(sound_group.Children) do
-			chatsounds.Runners.Yield()
-			flatten_sounds(child_group, ret, total_iters)
-		end
-
-		table.sort(ret, function(a, b) return a.StartIndex < b.StartIndex end)
 
 		return ret
 	end
@@ -417,13 +417,14 @@ if CLIENT then
 					end
 
 					local started = false
-					hook.Add("Think", stream, function()
-						if not IsValid(ply) then
+					local hook_name = ("chatsounds_stream_%s"):format(stream:GetId())
+					hook.Add("Think", hook_name, function()
+						if not IsValid(ply) or not IsValid(stream) then
 							if not started then
 								sound_task:resolve()
 							end
 
-							hook.Remove("Think", stream)
+							hook.Remove("Think", hook_name)
 							return
 						end
 
@@ -438,7 +439,11 @@ if CLIENT then
 									stream:Remove()
 								end
 
-								hook.Remove("Think", stream)
+								local success, err = pcall(hook.Remove, "Think", hook_name)
+								if not success then
+									PrintTable(stream)
+									print(err)
+								end
 							end
 
 							for _, modifier in ipairs(sound_data.Modifiers) do
