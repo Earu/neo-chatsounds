@@ -235,21 +235,36 @@ if CLIENT then
 	end
 
 	local MAX_ITERATIONS = 100
-	local function flatten_sounds(sound_group, ret)
+	local function flatten_sounds(sound_group, ret, total_iters)
 		ret = ret or {}
+		total_iters = total_iters or 0
 
 		if sound_group.Sounds then
 			local opts = sound_pre_process(sound_group, true)
 			local iters = math.min(MAX_ITERATIONS, opts.DuplicateCount or 1)
-			for _ = 1, iters do
+
+			if total_iters + iters > MAX_ITERATIONS then
+				iters = 1
+			end
+
+			total_iters = total_iters + iters
+
+			for i = 1, iters do
 				for _, sound_data in ipairs(sound_group.Sounds) do
 					chatsounds.Runners.Yield()
 					local snd_opts = sound_pre_process(sound_data, false)
-					local snd_iters = math.min(MAX_ITERATIONS, snd_opts.DuplicateCount or 1)
 
-					sound_data.Modifiers = table.Merge(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
+					local snd_iters = math.min(MAX_ITERATIONS, snd_opts.DuplicateCount or 1)
+					if total_iters + snd_iters > MAX_ITERATIONS then
+						snd_iters = 1
+					end
+
+					total_iters = total_iters + snd_iters
+
+					sound_data.Modifiers = table.Add(get_all_modifiers(sound_data.ParentScope), sound_data.Modifiers)
 
 					for _ = 1, snd_iters do
+						chatsounds.Runners.Yield()
 						table.insert(ret, sound_data)
 					end
 				end
@@ -258,7 +273,7 @@ if CLIENT then
 
 		for _, child_group in ipairs(sound_group.Children) do
 			chatsounds.Runners.Yield()
-			flatten_sounds(child_group, ret)
+			flatten_sounds(child_group, ret, total_iters)
 		end
 
 		table.sort(ret, function(a, b) return a.StartIndex < b.StartIndex end)
