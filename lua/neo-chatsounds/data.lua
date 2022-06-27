@@ -302,10 +302,24 @@ local function build_dynamic_lookup(dyn_lookup, sound_key)
 	end
 end
 
+local function compute_dynamic_lookup_hash()
+	return util.SHA1(table.concat(table.GetKeys(data.Repositories), ";"))
+end
+
 local function merge_repos(rebuild_dynamic_lookup)
 	local should_build_dynamic = false
-	if CLIENT and (rebuild_dynamic_lookup or not file.Exists("chatsounds/dyn_lookup.json", "DATA")) then
-		should_build_dynamic = true
+	if CLIENT then
+		if rebuild_dynamic_lookup or not file.Exists("chatsounds/dyn_lookup.json", "DATA") then
+			should_build_dynamic = true
+		end
+
+		if
+			not rebuild_dynamic_lookup
+			and file.Exists("chatsounds/dyn_lookup.json", "DATA")
+			and compute_dynamic_lookup_hash() ~= cookie.GetString("chatsounds_dyn_lookup")
+		then
+			should_build_dynamic = true
+		end
 	end
 
 	return chatsounds.Runners.Execute(function()
@@ -353,6 +367,7 @@ local function merge_repos(rebuild_dynamic_lookup)
 		if should_build_dynamic then
 			local json = chatsounds.Json.encode(lookup.Dynamic)
 			file.Write("chatsounds/dyn_lookup.json", json)
+			cookie.Set("chatsounds_dyn_lookup", compute_dynamic_lookup_hash())
 		end
 
 		data.Lookup = lookup
