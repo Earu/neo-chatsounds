@@ -240,7 +240,8 @@ end
 -- By diving sound keys into chunks we ensure that the time complexity needed to build a suggestion list is minimal because accessing a table with a hash key is O(1),
 -- that brings the total time complexity to somewhere around O(d + n) where d is the depth and n the amount of sound keys at that depth.
 -- Building this kind of lookup however is very expensive, which is why it should only be done ONCE, and then CACHED if possible.
-local MAX_DYN_CHUNK_CHUNK_SIZE = 1000
+local MAX_DYN_CHUNK_CHUNK_SIZE = 2e999 --1000
+-- TODO: fix completion breaking when deeper nodes
 local function build_dynamic_lookup(dyn_lookup, sound_key, existing_node_sounds)
 	local words = sound_key:Split(" ")
 
