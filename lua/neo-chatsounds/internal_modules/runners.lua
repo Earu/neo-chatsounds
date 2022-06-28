@@ -27,7 +27,7 @@ function runners.Execute(fn, ...)
 end
 
 local CS_RUNNER_INTERVAL = CreateConVar(
-	"chatsounds_runner_interval", "250", FCVAR_ARCHIVE,
+	"chatsounds_runner_interval", "2500", FCVAR_ARCHIVE,
 	"The interval in iterations between each runner yield, can lower or increase perfs",
 	10, 999999
 )
