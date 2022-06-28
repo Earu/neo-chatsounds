@@ -234,15 +234,16 @@ end
 -- Dynamically expanding table, this took me a while to figure out so I'll try to explain it.
 -- Because the lookup for the sound key of chatsounds is that large, its not appropriate to iterate over it for suggestions.
 -- The time complexity would be O(n) and essentially the game would freeze for 5/10 seconds each time you type a character.
--- The idea here is to subdivide the sound keys into recursive chunks of 25 sounds MAX each.
+-- The idea here is to subdivide the sound keys into recursive chunks of 1000 sounds MAX each.
 -- They can be then indexed by the depth marked at first level of the table e.g (lookup.Dynamic['g'].__depth or 1).
 -- Depending on the depth we may have something like: lookup.Dynamic = { ['g'] = { __depth = 2, ['a'] = { "im looking at gay porno", "gay porno", "gay" } } }
 -- By diving sound keys into chunks we ensure that the time complexity needed to build a suggestion list is minimal because accessing a table with a hash key is O(1),
 -- that brings the total time complexity to somewhere around O(d + n) where d is the depth and n the amount of sound keys at that depth.
 -- Building this kind of lookup however is very expensive, which is why it should only be done ONCE, and then CACHED if possible.
-local MAX_DYN_CHUNK_CHUNK_SIZE = 25
-local function build_dynamic_lookup(dyn_lookup, sound_key)
+local MAX_DYN_CHUNK_CHUNK_SIZE = 1000
+local function build_dynamic_lookup(dyn_lookup, sound_key, existing_node_sounds)
 	local words = sound_key:Split(" ")
+
 	if data.Loading then
 		data.Loading.Target = data.Loading.Target + #words
 	end
@@ -258,44 +259,59 @@ local function build_dynamic_lookup(dyn_lookup, sound_key)
 			}
 		end
 
-		local root_lookup = dyn_lookup[first_char]
-		local local_lookup = dyn_lookup[first_char]
-		if local_lookup.__depth then
+		local root_node = dyn_lookup[first_char]
+		local cur_node = dyn_lookup[first_char]
+		if root_node.__depth then
 			for i = 2, #word_key do
 				local char = word_key[i]
-				if not local_lookup[char] then
-					root_lookup.__depth = i
-					local_lookup.Keys[char] = {
-						Sounds = {},
-						Keys = {},
-					}
-				end
+				if not cur_node.Keys[char] then break end
 
-				local_lookup = local_lookup.Keys[char]
+				cur_node = cur_node.Keys[char]
 			end
 		end
 
-		table.insert(local_lookup.Sounds, sound_key)
+		if not existing_node_sounds[cur_node] then
+			existing_node_sounds[cur_node] = {}
+		end
 
-		if #local_lookup >= MAX_DYN_CHUNK_CHUNK_SIZE then
-			local depth = root_lookup.__depth or 1
-			for i, chunked_sound_key in ipairs(local_lookup.Sounds) do
-				chatsounds.Runners.Yield()
+		if not existing_node_sounds[cur_node][sound_key] then
+			existing_node_sounds[cur_node][sound_key] = true
+			table.insert(cur_node.Sounds, sound_key)
+		end
 
-				local char = chunked_sound_key[depth + 1]
-				if char then
-					if not local_lookup.Keys[char] then
-						local_lookup.Keys[char] = {
+		if #cur_node.Sounds >= MAX_DYN_CHUNK_CHUNK_SIZE then
+			local depth = root_node.__depth or 1
+			for sound_key_index, chunked_sound_key in ipairs(cur_node.Sounds) do
+				local target_node = cur_node
+				for i = 1, depth do
+					chatsounds.Runners.Yield()
+
+					local char = chunked_sound_key[i]
+					if not char then break end
+
+					if not cur_node.Keys[char] then
+						cur_node.Keys[char] = {
 							Sounds = {},
 							Keys = {},
 						}
 					end
 
-					table.insert(local_lookup.Keys[char], table.remove(local_lookup.Sounds, i))
+					target_node = cur_node.Keys[char]
 				end
+
+				if not existing_node_sounds[target_node] then
+					existing_node_sounds[target_node] = {}
+				end
+
+				if not existing_node_sounds[target_node][sound_key] then
+					existing_node_sounds[target_node][sound_key] = true
+					table.insert(target_node.Sounds, sound_key)
+				end
+
+				table.remove(cur_node.Sounds, sound_key_index)
 			end
 
-			root_lookup.__depth = depth + 1
+			root_node.__depth = depth + 1
 		end
 
 		update_loading_state()
@@ -339,6 +355,7 @@ local function merge_repos(rebuild_dynamic_lookup)
 			end
 		end
 
+		local existing_node_sounds = {}
 		for _, repo in pairs(data.Repositories) do
 			for sound_key, sound_list in pairs(repo.List) do
 				if not lookup.List[sound_key] then
@@ -359,7 +376,7 @@ local function merge_repos(rebuild_dynamic_lookup)
 				table.sort(lookup.List[sound_key], function(a, b) return a.Url < b.Url end) -- preserve indexes unless a new sound is added
 
 				if should_build_dynamic then
-					build_dynamic_lookup(lookup.Dynamic, sound_key)
+					build_dynamic_lookup(lookup.Dynamic, sound_key, existing_node_sounds)
 				end
 			end
 		end
@@ -437,9 +454,12 @@ if SERVER then
 	end)
 
 	hook.Add("PlayerFullLoad", "chatsounds.Data.Config", function(ply)
-		net.Start("chatsounds_repos")
-			net.WriteString(data.RepoConfigJson)
-		net.Send(ply)
+		-- wait a bit before networking the config to mitigate config not being received by clients
+		timer.Simple(2, function()
+			net.Start("chatsounds_repos")
+				net.WriteString(data.RepoConfigJson)
+			net.Send(ply)
+		end)
 	end)
 end
 
@@ -498,7 +518,12 @@ function data.CompileLists(force_recompile)
 		data.BuildFromGitHubMsgPack("PAC3-Server/chatsounds-valve-games", "master", "tf2", force_recompile),
 	]]--
 
+	local repo_processing = false
 	local function process_repos(rebuild_dynamic_lookup)
+		if repo_processing then return end
+
+		repo_processing = true
+
 		data.Loading.Current = 0
 		data.Loading.Text = "Merging chatsounds repositories... %d%%"
 
@@ -653,7 +678,7 @@ if CLIENT then
 		end
 
 		for key, child_node in pairs(node.Keys) do
-			add_nested_suggestions(child_node, text, nested_suggestion)
+			add_nested_suggestions(child_node, text, nested_suggestions, added_suggestions)
 		end
 	end
 
@@ -733,12 +758,15 @@ if CLIENT then
 				for i = 2, #last_word do
 					if not last_word[i] then break end
 
-					node = node.Keys[last_word[i]]
+					local next_node = node.Keys[last_word[i]]
+					if not next_node then break end
+
+					node = next_node
 				end
 
 				sounds = node.Sounds
 
-				for _, child_node in ipairs(node.Keys) do
+				for _, child_node in pairs(node.Keys) do
 					add_nested_suggestions(child_node, text, suggestions, added_suggestions)
 				end
 			else
@@ -770,6 +798,7 @@ if CLIENT then
 		if data.Loading then return end
 		if #data.Suggestions == 0 then return end
 		if not chatsounds.Enabled then return end
+		if not LocalPlayer():IsTyping() then return end
 
 		local chat_x, chat_y = chat.GetChatBoxPos()
 		local _, chat_h = chat.GetChatBoxSize()
