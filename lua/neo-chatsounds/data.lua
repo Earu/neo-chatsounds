@@ -283,7 +283,7 @@ local function build_dynamic_lookup(dyn_lookup, sound_key, existing_node_sounds)
 			local depth = root_node.__depth or 1
 			for sound_key_index, chunked_sound_key in ipairs(cur_node.Sounds) do
 				local target_node = cur_node
-				for i = 1, depth do
+				for i = depth, #chunked_sound_key do
 					chatsounds.Runners.Yield()
 
 					local char = chunked_sound_key[i]
@@ -298,6 +298,8 @@ local function build_dynamic_lookup(dyn_lookup, sound_key, existing_node_sounds)
 
 					target_node = cur_node.Keys[char]
 				end
+
+				if target_node == cur_node then continue end
 
 				if not existing_node_sounds[target_node] then
 					existing_node_sounds[target_node] = {}
