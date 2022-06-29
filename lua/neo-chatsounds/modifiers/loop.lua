@@ -1,7 +1,7 @@
 local MODIFIER = {}
 
 MODIFIER.Name = "loop"
-MODIFIER.DefaultValue = 0
+MODIFIER.DefaultValue = 1
 
 function MODIFIER:ParseArgs(args)
 	local n = tonumber(args)

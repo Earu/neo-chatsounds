@@ -124,21 +124,21 @@ function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 				local sound_key = raw_sound_data[2]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " ")
 				local path = raw_sound_data[3]
 
-				if #sound_key == 0 then continue end
+				if #sound_key > 0 then
+					if not data.Repositories[repo_key].List[sound_key] then
+						data.Repositories[repo_key].List[sound_key] = {}
+					end
 
-				if not data.Repositories[repo_key].List[sound_key] then
-					data.Repositories[repo_key].List[sound_key] = {}
+					local url = ("https://raw.githubusercontent.com/%s/%s/%s/%s"):format(repo, branch, base_path, path):gsub("%s", "%%20")
+					local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
+					local sound_data = {
+						Url = url,
+						Realm = realm,
+						Path = sound_path,
+					}
+
+					table.insert(data.Repositories[repo_key].List[sound_key], sound_data)
 				end
-
-				local url = ("https://raw.githubusercontent.com/%s/%s/%s/%s"):format(repo, branch, base_path, path):gsub("%s", "%%20")
-				local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
-				local sound_data = {
-					Url = url,
-					Realm = realm,
-					Path = sound_path,
-				}
-
-				table.insert(data.Repositories[repo_key].List[sound_key], sound_data)
 			end
 
 			data.CacheRepository(repo, branch, base_path)
@@ -196,30 +196,30 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 
 				update_loading_state()
 
-				if file_data.path:GetExtensionFromFilename() ~= "ogg" then continue end
+				if file_data.path:GetExtensionFromFilename() == "ogg" then
+					sound_count = sound_count + 1
 
-				sound_count = sound_count + 1
+					local path = file_data.path:gsub("^" .. base_path:PatternSafe(), "")
+					local path_chunks = path:Split("/")
+					local realm = path_chunks[2]:lower()
+					local sound_key = path_chunks[3]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):Trim()
 
-				local path = file_data.path:gsub("^" .. base_path:PatternSafe(), "")
-				local path_chunks = path:Split("/")
-				local realm = path_chunks[2]:lower()
-				local sound_key = path_chunks[3]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):Trim()
+					if #sound_key > 0 then
+						if not data.Repositories[repo_key].List[sound_key] then
+							data.Repositories[repo_key].List[sound_key] = {}
+						end
 
-				if #sound_key == 0 then continue end
+						local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, file_data.path):gsub("%s", "%%20")
+						local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
+						local sound_data = {
+							Url = url,
+							Realm = realm,
+							Path = sound_path,
+						}
 
-				if not data.Repositories[repo_key].List[sound_key] then
-					data.Repositories[repo_key].List[sound_key] = {}
+						table.insert(data.Repositories[repo_key].List[sound_key], sound_data)
+					end
 				end
-
-				local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, file_data.path):gsub("%s", "%%20")
-				local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
-				local sound_data = {
-					Url = url,
-					Realm = realm,
-					Path = sound_path,
-				}
-
-				table.insert(data.Repositories[repo_key].List[sound_key], sound_data)
 			end
 
 			data.CacheRepository(repo, branch, base_path)
@@ -300,18 +300,18 @@ local function build_dynamic_lookup(dyn_lookup, sound_key, existing_node_sounds)
 					target_node = cur_node.Keys[char]
 				end
 
-				if target_node == cur_node then continue end
+				if target_node ~= cur_node then
+					if not existing_node_sounds[target_node] then
+						existing_node_sounds[target_node] = {}
+					end
 
-				if not existing_node_sounds[target_node] then
-					existing_node_sounds[target_node] = {}
+					if not existing_node_sounds[target_node][sound_key] then
+						existing_node_sounds[target_node][sound_key] = true
+						table.insert(target_node.Sounds, sound_key)
+					end
+
+					table.remove(cur_node.Sounds, sound_key_index)
 				end
-
-				if not existing_node_sounds[target_node][sound_key] then
-					existing_node_sounds[target_node][sound_key] = true
-					table.insert(target_node.Sounds, sound_key)
-				end
-
-				table.remove(cur_node.Sounds, sound_key_index)
 			end
 
 			root_node.__depth = depth + 1
@@ -369,11 +369,12 @@ local function merge_repos(rebuild_dynamic_lookup)
 				for _, sound_data in pairs(sound_list) do
 					chatsounds.Runners.Yield()
 
-					if urls[sound_data.Url] then continue end
-					table.insert(lookup.List[sound_key], sound_data)
-					urls[sound_data.Url] = true
+					if not urls[sound_data.Url] then
+						table.insert(lookup.List[sound_key], sound_data)
+						urls[sound_data.Url] = true
 
-					update_loading_state()
+						update_loading_state()
+					end
 				end
 
 				table.sort(lookup.List[sound_key], function(a, b) return a.Url < b.Url end) -- preserve indexes unless a new sound is added
@@ -669,8 +670,95 @@ if CLIENT then
 		local scroll = (input.IsButtonDown(KEY_LSHIFT) or input.IsButtonDown(KEY_RSHIFT) or input.IsKeyDown(KEY_LCONTROL)) and -1 or 1
 		data.SuggestionsIndex = (data.SuggestionsIndex + scroll) % #data.Suggestions
 
-		return data.Suggestions[data.SuggestionsIndex + 1]
+		local choice = data.Suggestions[data.SuggestionsIndex + 1]
+		if istable(choice) then return choice.Suggestion end
+
+		return choice
 	end)
+
+	local INDEX_SELECTION_PATTERN = "#(%d+)$"
+	local function process_index_completion(text, suggestions, added_suggestions)
+		local match = text:match(INDEX_SELECTION_PATTERN)
+		if not match then return false end
+
+		local index = tonumber(match)
+		if not index then return false end
+
+		text = text:gsub(INDEX_SELECTION_PATTERN, "")
+		local sounds = chatsounds.Parser.ParseSoundTriggers(text)
+		if not #sounds then return false end
+
+		local last_sound = sounds[#sounds]
+		for i, sound_data in ipairs(chatsounds.Data.Lookup.List[last_sound.Key]) do
+			if not added_suggestions[sound_data.Url] then
+				local suggestion = ("%s%s#%d%s"):format(string.sub(text, 1, last_sound.StartIndex - 1), last_sound.Key, i, string.sub(text, last_sound.EndIndex + 1))
+				table.insert(suggestions, { Suggestion = suggestion, Extra = (":realm( %s )"):format(sound_data.Realm) })
+				added_suggestions[sound_data.Url] = true
+			end
+		end
+
+		data.SuggestionsIndex = -1
+		data.Suggestions = suggestions
+		return true
+	end
+
+	local MODIFIER_PATTERN = ":([%w_]+)[%[%]%(%w%s,%.]*$"
+	local MODIFIER_ARGS_PATTERN = ":[%w_]+%(([%[%]%w%s,%.]*)$"
+	local function process_modifier_completion(text, suggestions, added_suggestions)
+		local modifier = text:match(MODIFIER_PATTERN)
+		local arguments = text:match(MODIFIER_ARGS_PATTERN)
+		if modifier then
+			local without_modifier = text:gsub(MODIFIER_PATTERN, "")
+			if not arguments then
+				for name, _ in pairs(chatsounds.Modifiers) do
+					if name:StartWith(modifier) and not added_suggestions[name] then
+						table.insert(suggestions, ("%s:%s"):format(without_modifier, name))
+						added_suggestions[name] = true
+					end
+				end
+			else
+				local mod = chatsounds.Modifiers[modifier]
+				if not mod then
+					data.SuggestionsIndex = -1
+					data.Suggestions = suggestions
+					return
+				end
+
+				local suggest_arguments = arguments
+				local split_args = arguments:Split(",")
+
+				if type(mod.DefaultValue) == "table" then
+					local types = {}
+					local current_amount = 0
+					local append_comma = true
+					for _, v in ipairs(split_args) do
+						local is_empty = v:Trim():len() == 0
+						append_comma = not is_empty and append_comma
+						current_amount = current_amount + (is_empty and 0 or 1)
+					end
+
+					for i, value in ipairs(mod.DefaultValue) do
+						local comma = append_comma and i == current_amount + 1
+						types[math.max(i - current_amount, 1)] = ("%s[%s]"):format(comma and ", " or "", type(value))
+					end
+
+					if #mod.DefaultValue ~= current_amount then
+						suggest_arguments = suggest_arguments .. table.concat(types, ", "):sub(1, -1)
+					end
+				elseif split_args[1]:Trim():len() == 0 then
+					suggest_arguments = ("%s[%s]"):format(suggest_arguments, type(mod.DefaultValue))
+				end
+
+				table.insert(suggestions, ("%s:%s(%s)"):format(without_modifier, modifier, suggest_arguments))
+			end
+
+			data.SuggestionsIndex = -1
+			data.Suggestions = suggestions
+			return true
+		end
+
+		return false
+	end
 
 	local function add_nested_suggestions(node, text, nested_suggestions, added_suggestions)
 		for _, sound_key in ipairs(node.Sounds) do
@@ -700,59 +788,11 @@ if CLIENT then
 		local search_words = text:Split(" ")
 		local last_word = search_words[#search_words]
 
-		local MODIFIER_PATTERN = ":([%w_]+)[%[%]%(%w%s,%.]*$"
-		local modifier = text:match(MODIFIER_PATTERN)
-		local arguments = text:match(":[%w_]+%(([%[%]%w%s,%.]*)$")
-		if modifier then
-			local without_modifier = text:gsub(MODIFIER_PATTERN, "")
-			if not arguments then
-				for name, _ in pairs(chatsounds.Modifiers) do
-					if not name:StartWith(modifier) or added_suggestions[name] then continue end
+		local processed = process_index_completion(text, suggestions, added_suggestions)
+		if processed then return end
 
-					suggestions[#suggestions + 1] = without_modifier .. ":" .. name
-					added_suggestions[name] = true
-				end
-			else
-				local mod = chatsounds.Modifiers[modifier]
-				if not mod then
-					data.SuggestionsIndex = -1
-					data.Suggestions = suggestions
-					return
-				end
-
-				local suggest_arguments = arguments
-				local split_args = arguments:Split(",")
-
-				if type(mod.DefaultValue) == "table" then
-					local types = {}
-					local current_amount = 0
-					local append_comma = true
-					for _, v in ipairs(split_args) do
-						local is_empty = v:Trim():len() == 0
-						append_comma = not is_empty and append_comma
-						current_amount = current_amount + (is_empty and 0 or 1)
-					end
-
-					for i, value in ipairs(mod.DefaultValue) do
-						local comma = append_comma and i == current_amount + 1
-						types[math.max(i - current_amount, 1)] = (comma and ", " or "") .. "[" .. type(value) .. "]"
-					end
-
-					if #mod.DefaultValue ~= current_amount then
-						suggest_arguments = suggest_arguments .. table.concat(types, ", "):sub(1, -1)
-					end
-				elseif split_args[1]:Trim():len() == 0 then
-					suggest_arguments = suggest_arguments ..
-						"[" .. type(mod.DefaultValue) .. "]"
-				end
-
-				suggestions[#suggestions + 1] = without_modifier .. ":" .. modifier .. "(" .. suggest_arguments .. ")"
-			end
-
-			data.SuggestionsIndex = -1
-			data.Suggestions = suggestions
-			return
-		end
+		processed = process_modifier_completion(text, suggestions, added_suggestions)
+		if processed then return end
 
 		local sounds = {}
 		local node = data.Lookup.Dynamic[last_word[1]]
@@ -809,21 +849,33 @@ if CLIENT then
 		local i = 1
 		local base_x, base_y = chat_x, chat_y + chat_h + 5
 		for index = data.SuggestionsIndex + 1, #data.Suggestions + (#data.Suggestions - data.SuggestionsIndex + 1) do
+			local extra
 			local suggestion = data.Suggestions[index]
-			if not suggestion then continue end
-
-			local x, y = base_x, base_y + (i - 1) * FONT_HEIGHT
-			if y > ScrH() then return end
-
-			draw_shadowed_text(("%03d."):format(index), x, y, 200, 200, 255, 255)
-
-			if index == data.SuggestionsIndex + 1 then
-				draw_shadowed_text(suggestion, x + 50, y, 255, 0, 0, 255)
-			else
-				draw_shadowed_text(suggestion, x + 50, y, 255, 255, 255, 255)
+			if istable(suggestion) then
+				extra = suggestion.Extra
+				suggestion = suggestion.Suggestion
 			end
 
-			i = i + 1
+			if suggestion then
+				local x, y = base_x, base_y + (i - 1) * FONT_HEIGHT
+				if y > ScrH() then return end
+
+				draw_shadowed_text(("%03d."):format(index), x, y, 200, 200, 255, 255)
+
+				local r, g, b, a = 255, 255, 255, 255
+				if index == data.SuggestionsIndex + 1 then
+					r, g, b, a = 255, 0, 0, 255
+				end
+
+				draw_shadowed_text(suggestion, x + 50, y, r, g, b, a)
+
+				if extra then
+					local tw, _ = surface.GetTextSize(suggestion)
+					draw_shadowed_text(extra, x + 50 + tw + 20, y, 255, 200, 80, 255)
+				end
+
+				i = i + 1
+			end
 		end
 
 		if data.SuggestionsIndex + 1 ~= 1 then
@@ -832,16 +884,27 @@ if CLIENT then
 		end
 
 		for j = 1, data.SuggestionsIndex do
+			local extra
 			local suggestion = data.Suggestions[j]
-			if not suggestion then continue end
+			if istable(suggestion) then
+				extra = suggestion.Extra
+				suggestion = suggestion.Suggestion
+			end
 
-			local x, y = base_x, base_y + (i - 1) * FONT_HEIGHT
-			if y > ScrH() then return end
+			if suggestion then
+				local x, y = base_x, base_y + (i - 1) * FONT_HEIGHT
+				if y > ScrH() then return end
 
-			draw_shadowed_text(("%03d."):format(j), x, y, 200, 200, 255, 255)
-			draw_shadowed_text(suggestion, x + 50, y, 255, 255, 255, 255)
+				draw_shadowed_text(("%03d."):format(j), x, y, 200, 200, 255, 255)
+				draw_shadowed_text(suggestion, x + 50, y, 255, 255, 255, 255)
 
-			i = i + 1
+				if extra then
+					local tw, _ = surface.GetTextSize(suggestion)
+					draw_shadowed_text(extra, x + 50 + tw + 20, y, 255, 200, 80, 255)
+				end
+
+				i = i + 1
+			end
 		end
 	end)
 end

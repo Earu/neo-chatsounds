@@ -45,6 +45,57 @@ end
 
 table.sort(legacy_modifiers, function(a, b) return b:len() < a:len() end)
 
+function parser.ParseSoundTriggers(str)
+	if not str then return {} end
+
+	str = str_trim(str)
+	if #str == 0 then return {} end
+
+	if chatsounds.Data.Lookup.List[str] then
+		return {
+			{ Key = str, StartIndex = 1, EndIndex = #str }
+		}
+	end
+
+	local sounds = {}
+	local relative_start_index = 1
+	while relative_start_index <= #str do
+		local matched = false
+		local last_space_index = -1
+		for relative_index = #str, relative_start_index, -1 do
+			chatsounds.Runners.Yield()
+
+			local cur_char = str[relative_index]
+
+			-- we only want to match with words so account for space chars and end of string
+			if SPACE_CHARS[cur_char] or relative_index == #str then
+				last_space_index = relative_index
+
+				local str_chunk = str_gsub(str_sub(str, relative_start_index, relative_index), IGNORED_CHARS_PATTERN, "")
+				str_chunk = str_trim(str_chunk) -- need to trim here, because the player can chain multiple spaces
+
+				if #str_chunk > 0 and chatsounds.Data.Lookup.List[str_chunk] then
+					table_insert(sounds, { Key = str_chunk, StartIndex = relative_start_index, EndIndex = relative_start_index + #str_chunk })
+					relative_start_index = relative_index + 1
+					matched = true
+					break
+				end
+			end
+		end
+
+		if not matched then
+			-- that means there was only one word and it wasnt a sound
+			if last_space_index == -1 then
+				break -- no more words, break out of this loop
+			else
+				relative_start_index = last_space_index + 1
+			end
+		end
+	end
+
+	return sounds
+end
+
 local function parse_sounds(raw_str, index, ctx)
 	if #ctx.CurrentStr == 0 then return end
 
@@ -82,23 +133,23 @@ local function parse_sounds(raw_str, index, ctx)
 						cur_scope.Sounds = cur_scope.Sounds or {}
 
 						local chunk_index_start, chunk_index_end = str_find(raw_str, str_chunk, ctx.LastParsedSoundEndIndex or index, true)
-						if not chunk_index_start then continue end
+						if chunk_index_start then
+							ctx.LastParsedSoundEndIndex = chunk_index_end
 
-						ctx.LastParsedSoundEndIndex = chunk_index_end
+							local new_sound = {
+								Key = str_chunk,
+								Modifiers = {},
+								Type = "sound",
+								StartIndex = chunk_index_start,
+								EndIndex = chunk_index_end,
+								ParentScope = cur_scope,
+							}
 
-						local new_sound = {
-							Key = str_chunk,
-							Modifiers = {},
-							Type = "sound",
-							StartIndex = chunk_index_start,
-							EndIndex = chunk_index_end,
-							ParentScope = cur_scope,
-						}
-
-						table_insert(cur_scope.Sounds, new_sound)
-						relative_start_index = relative_index + 1
-						matched = true
-						break
+							table_insert(cur_scope.Sounds, new_sound)
+							relative_start_index = relative_index + 1
+							matched = true
+							break
+						end
 					end
 				end
 			end
