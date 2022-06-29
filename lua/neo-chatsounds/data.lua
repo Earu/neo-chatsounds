@@ -686,7 +686,7 @@ if CLIENT then
 
 		text = text:gsub(INDEX_SELECTION_PATTERN, "")
 		local sounds = chatsounds.Parser.ParseSoundTriggers(text)
-		if not #sounds then return false end
+		if #sounds == 0 then return false end
 
 		local last_sound = sounds[#sounds]
 		for i, sound_data in ipairs(chatsounds.Data.Lookup.List[last_sound.Key]) do
