@@ -14,4 +14,4 @@
 - [ ] Completion that shows the realm you are selecting with #/select modifier
 - [ ] Reverb modifier
 - [ ] EQ modifier
-- [ ] Local saysound (concommand?)
+- [x] Local saysound (concommand?)

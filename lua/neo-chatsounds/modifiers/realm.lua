@@ -4,7 +4,7 @@ MODIFIER.Name = "realm"
 MODIFIER.DefaultValue = ""
 
 function MODIFIER:ParseArgs(args)
-	return args
+	return args:Trim()
 end
 
 function MODIFIER:OnSelection(index, matching_sounds)
@@ -12,9 +12,9 @@ function MODIFIER:OnSelection(index, matching_sounds)
 
 	local ret = {}
 	for _, matching_sound in ipairs(matching_sounds) do
-		if self.Value ~= matching_sound.Realm then continue end
-
-		table.insert(ret, matching_sound)
+		if self.Value == matching_sound.Realm then
+			table.insert(ret, matching_sound)
+		end
 	end
 
 	return index, ret
