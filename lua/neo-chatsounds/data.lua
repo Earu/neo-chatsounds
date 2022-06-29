@@ -548,11 +548,6 @@ function data.CompileLists(force_recompile)
 			return
 		end
 
-		if data.Loading.Target <= data.Loading.Current then
-			process_repos(false)
-			timer.Remove("chatsounds_repos")
-		end
-
 		time_in_secs = time_in_secs + 1
 		if time_in_secs >= 60 * 5 then
 			process_repos(false)
