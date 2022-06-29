@@ -174,7 +174,8 @@ local function parse_sounds(raw_str, index, ctx)
 				local modifier = ctx.Modifiers[i]
 				if modifier.StartIndex < last_sound.EndIndex then break end
 
-				table_insert(last_sound.Modifiers, table_remove(ctx.Modifiers, i, ctx.Modifiers))
+				table_insert(last_sound.Modifiers, modifier)
+				table_remove(ctx.Modifiers, i)
 			end
 		end
 	end
