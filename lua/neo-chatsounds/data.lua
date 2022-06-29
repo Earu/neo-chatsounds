@@ -670,31 +670,6 @@ if CLIENT then
 		return choice
 	end)
 
-	local INDEX_SELECTION_PATTERN = "#(%d+)$"
-	local function process_index_completion(text, suggestions, added_suggestions)
-		local match = text:match(INDEX_SELECTION_PATTERN)
-		if not match then return false end
-
-		local index = tonumber(match)
-		if not index then return false end
-
-		text = text:gsub(INDEX_SELECTION_PATTERN, "")
-		local sounds = chatsounds.Parser.ParseSoundTriggers(text)
-		if #sounds == 0 then return false end
-
-		local last_sound = sounds[#sounds]
-		for i, sound_data in ipairs(chatsounds.Data.Lookup.List[last_sound.Key]) do
-			if not added_suggestions[sound_data.Url] then
-				local suggestion = ("%s%s#%d%s"):format(string.sub(text, 1, last_sound.StartIndex - 1), last_sound.Key, i, string.sub(text, last_sound.EndIndex + 1))
-				table.insert(suggestions, { Suggestion = suggestion, Extra = (":realm( %s )"):format(sound_data.Realm) })
-				added_suggestions[sound_data.Url] = true
-			end
-		end
-
-		data.SuggestionsIndex = -1
-		data.Suggestions = suggestions
-		return true
-	end
 
 	local MODIFIER_PATTERN = ":([%w_]+)[%[%]%(%w%s,%.]*$"
 	local MODIFIER_ARGS_PATTERN = ":[%w_]+%(([%[%]%w%s,%.]*)$"
@@ -746,8 +721,6 @@ if CLIENT then
 				table.insert(suggestions, ("%s:%s(%s)"):format(without_modifier, modifier, suggest_arguments))
 			end
 
-			data.SuggestionsIndex = -1
-			data.Suggestions = suggestions
 			return true
 		end
 
@@ -782,11 +755,23 @@ if CLIENT then
 		local search_words = text:Split(" ")
 		local last_word = search_words[#search_words]
 
-		local processed = process_index_completion(text, suggestions, added_suggestions)
-		if processed then return end
+		for _, modifier_base in pairs(chatsounds.Modifiers) do
+			if modifier_base.OnCompletion then
+				local ret = modifier_base.OnCompletion(text, suggestions, added_suggestions)
+				if ret then
+					data.Suggestions = suggestions
+					data.SuggestionsIndex = -1
+					return
+				end
+			end
+		end
 
-		processed = process_modifier_completion(text, suggestions, added_suggestions)
-		if processed then return end
+		local processed = process_modifier_completion(text, suggestions, added_suggestions)
+		if processed then
+			data.Suggestions = suggestions
+			data.SuggestionsIndex = -1
+			return
+		end
 
 		local sounds = {}
 		local node = data.Lookup.Dynamic[last_word[1]]
