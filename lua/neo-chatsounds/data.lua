@@ -84,7 +84,7 @@ function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 	local t = chatsounds.Tasks.new()
 	chatsounds.Http.Get(msg_pack_url):next(function(res)
 		local rate_limited = handle_rate_limit(res, t, data.BuildFromGitHubMsgPack, repo, branch, base_path, force_recompile)
-		if rate_limited then return end
+		if rate_limited then return t end
 
 		local is_cache_valid, hash = check_cache_validity(res.Body, repo, base_path, branch)
 		if is_cache_valid and not force_recompile then
@@ -92,7 +92,7 @@ function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 			data.LoadCachedRepository(repo, branch, base_path)
 			t:resolve(false)
 
-			return
+			return t
 		else
 			chatsounds.Log(("Cached repository for %s/%s/%s is out of date, re-compiling..."):format(repo, branch, base_path))
 		end
@@ -157,15 +157,14 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 	local t = chatsounds.Tasks.new()
 	chatsounds.Http.Get(api_url):next(function(res)
 		local rate_limited = handle_rate_limit(res, t, data.BuildFromGithub, repo, branch, base_path, force_recompile)
-		if rate_limited then return end
+		if rate_limited then return t end
 
 		local is_cache_valid, hash = check_cache_validity(res.Body, repo, base_path, branch)
 		if is_cache_valid and not force_recompile then
 			chatsounds.Log(("%s/%s/%s is up to date, not re-compiling lists"):format(repo, branch, base_path))
 			data.LoadCachedRepository(repo, branch, base_path)
 			t:resolve(false)
-
-			return
+			return t
 		else
 			chatsounds.Log(("Cached repository for %s/%s/%s is out of date, re-compiling..."):format(repo, branch, base_path))
 		end
@@ -173,7 +172,7 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 		local resp = chatsounds.Json.decode(res.Body)
 		if not resp or not resp.tree then
 			t:reject("Invalid response from GitHub:\n" .. chatsounds.Json.encode(resp))
-			return
+			return t
 		end
 
 		if data.Loading then
