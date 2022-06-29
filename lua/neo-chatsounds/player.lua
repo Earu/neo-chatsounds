@@ -500,7 +500,11 @@ if CLIENT then
 
 	local CONTEXT_SEPARATOR = ";"
 	function cs_player.PlayAsync(ply, text)
-		if text[1] == CONTEXT_SEPARATOR then return end
+		if text[1] == CONTEXT_SEPARATOR then
+			local t = chatsounds.Tasks.new()
+			t:resolve()
+			return t
+		end
 
 		local tasks = {}
 		local text_chunks = text:Split(CONTEXT_SEPARATOR)
@@ -529,6 +533,8 @@ if CLIENT then
 	end
 
 	local function handler(ply, text)
+		if not chatsounds.Enabled then return end
+		if chatsounds.Data.Loading then return end
 		if ply ~= LocalPlayer() then return end
 
 		net.Start("chatsounds_cmd")
@@ -544,6 +550,17 @@ if CLIENT then
 		handler(ply, str)
 	end)
 
+	concommand.Add("chatsounds_local_say", function(ply, _, _, str)
+		if not chatsounds.Enabled then return end
+		if chatsounds.Data.Loading then return end
+
+		cs_player.PlayAsync(ply, str):next(nil, function(errors)
+			for _, err in ipairs(errors) do
+				chatsounds.Error(err)
+			end
+		end)
+	end)
+
 	net.Receive("chatsounds", function()
 		if not chatsounds.Enabled then return end
 		if chatsounds.Data.Loading then return end
@@ -553,14 +570,11 @@ if CLIENT then
 
 		if not IsValid(ply) then return end
 
-		local t = cs_player.PlayAsync(ply, text)
-		if t then
-			t:next(nil, function(errors)
-				for _, err in ipairs(errors) do
-					chatsounds.Error(err)
-				end
-			end)
-		end
+		cs_player.PlayAsync(ply, text):next(nil, function(errors)
+			for _, err in ipairs(errors) do
+				chatsounds.Error(err)
+			end
+		end)
 	end)
 
 	-- this is necessary otherwise when using the first sounds with webaudio it just fails to play
