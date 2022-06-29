@@ -11,7 +11,7 @@
 - [ ] Proper realm/sound blocking features?
 - [ ] Stacking modifiers ? e.g world--50--50 becomes --25 internally?
 - [x] Completion that completes your currently typed modifier
-- [ ] Completion that shows the realm you are selecting with #/select modifier
+- [x] Completion that shows the realm you are selecting with #/select modifier
 - [ ] Reverb modifier
 - [ ] EQ modifier
 - [x] Local saysound (concommand?)
