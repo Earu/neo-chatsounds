@@ -34,4 +34,13 @@ function MODIFIER:OnStreamThink(stream)
 	stream:SetVolume(self:GetValue())
 end
 
+local YELLING_PATTERN = "(![?!1]+)$"
+hook.Add("ChatsoundsParserPreParse", "chatsounds.Modifiers.Volume", function(str)
+	local match = str:match(YELLING_PATTERN)
+	if match then
+		local volume = math.max(#match or 1, 1)
+		return ("(%s):volume(%d)"):format(str:gsub(YELLING_PATTERN, ""), volume)
+	end
+end)
+
 return MODIFIER
