@@ -100,8 +100,8 @@ if CLIENT then
 		end)
 	end
 
-	function cs_player.GetWantedSound(sound_data, last_sound)
-		math.randomseed(math.Round(CurTime()))
+	function cs_player.GetWantedSound(sound_data, last_sound, seed)
+		math.randomseed(seed or math.Round(CurTime()))
 
 		local matching_sounds = chatsounds.Data.Lookup.List[sound_data.Key]
 		local index = math.random(1, #matching_sounds)
@@ -373,7 +373,7 @@ if CLIENT then
 					continue
 				end
 
-				local _sound = cs_player.GetWantedSound(sound_data, last_sound)
+				local _sound = cs_player.GetWantedSound(sound_data, last_sound, math.Round(CurTime()) + i)
 				last_sound = _sound
 
 				local sound_dir_path = _sound.Path:GetPathFromFilename()
