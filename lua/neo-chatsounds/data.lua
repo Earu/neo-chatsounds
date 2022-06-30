@@ -677,7 +677,9 @@ if CLIENT then
 		local modifier = text:match(MODIFIER_PATTERN)
 		local arguments = text:match(MODIFIER_ARGS_PATTERN)
 		if modifier then
-			local without_modifier = text:gsub(MODIFIER_PATTERN, "")
+			local without_modifier = text:gsub(MODIFIER_PATTERN, ""):Trim()
+			if #without_modifier == 0 then return false end
+
 			if not arguments then
 				for name, _ in pairs(chatsounds.Modifiers) do
 					if name:StartWith(modifier) and not added_suggestions[name] then
