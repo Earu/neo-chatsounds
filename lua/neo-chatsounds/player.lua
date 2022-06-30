@@ -373,7 +373,7 @@ if CLIENT then
 					continue
 				end
 
-				local _sound = cs_player.GetWantedSound(sound_data, last_sound, math.Round(CurTime()) + i)
+				local _sound = cs_player.GetWantedSound(sound_data, last_sound, math.Round(CurTime()) + i * 1028)
 				last_sound = _sound
 
 				local sound_dir_path = _sound.Path:GetPathFromFilename()

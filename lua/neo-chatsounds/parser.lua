@@ -338,6 +338,9 @@ local function parse_str(raw_str)
 		end)
 	end
 
+	local ret = hook.Run("ChatsoundsParserPreParse", raw_str)
+	if isstring(ret) then raw_str = ret end
+
 	local ctx = {
 		Scopes = { global_scope },
 		InLuaExpression = false,
