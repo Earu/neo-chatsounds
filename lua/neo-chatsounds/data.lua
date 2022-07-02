@@ -77,6 +77,15 @@ local function check_cache_validity(body, repo, path, branch)
 	return false, hash
 end
 
+local function encode_sound_path(path)
+	local path_chunks = path:Split("/")
+	path_chunks[#path_chunks] = path_chunks[#path_chunks]:gsub("%d", function(n)
+		return "%3" .. n
+	end)
+
+	return table.concat(path_chunks, "/")
+end
+
 function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 	branch = branch or "master"
 
@@ -122,7 +131,7 @@ function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 
 				local realm = raw_sound_data[1]:lower()
 				local sound_key = raw_sound_data[2]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " ")
-				local path = raw_sound_data[3]
+				local path = encode_sound_path(raw_sound_data[3])
 
 				if #sound_key > 0 then
 					if not data.Repositories[repo_key].List[sound_key] then
@@ -208,7 +217,7 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 							data.Repositories[repo_key].List[sound_key] = {}
 						end
 
-						local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, file_data.path):gsub("%s", "%%20")
+						local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, encode_sound_path(file_data.path)):gsub("%s", "%%20")
 						local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
 						local sound_data = {
 							Url = url,
