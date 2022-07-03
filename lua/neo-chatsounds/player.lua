@@ -401,7 +401,7 @@ if CLIENT then
 						chatsounds.DebugLog(("Downloaded %s"):format(_sound.Url))
 						streams[i] = prepare_stream(_sound, download_task)
 					end, function(err)
-						download_task:reject(err)
+						download_task:reject(("Failed to download %s: %s"):format(_sound.Url, err))
 					end)
 				else
 					streams[i] = prepare_stream(_sound, download_task)
