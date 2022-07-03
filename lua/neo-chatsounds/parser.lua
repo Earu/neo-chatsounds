@@ -287,7 +287,9 @@ local scope_handlers = {
 			end
 		end
 
-		table_insert(ctx.Modifiers, 1, modifier)
+		if modifier then
+			table_insert(ctx.Modifiers, 1, modifier)
+		end
 
 		local space_index = str_find(ctx.CurrentStr, SPACE_CHARS_PATTERN, 1, true)
 		ctx.CurrentStr = space_index and str_trim(str_sub(ctx.CurrentStr, space_index)) or ""
