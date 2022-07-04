@@ -346,6 +346,7 @@ if CLIENT then
 		end
 	end
 
+	local SOUND_WHITENOISE_DURATION_APROMIXATION = 0.075
 	function cs_player.PlaySoundGroupAsync(ply, sound_group)
 		local finished_task = chatsounds.Tasks.new()
 		if sound_group.Type ~= "group" then
@@ -435,7 +436,7 @@ if CLIENT then
 						if not started then
 							stream:SetSourceEntity(ply)
 							stream:Set3D(true)
-							stream.Duration = stream:GetLength()
+							stream.Duration = stream:GetLength() - SOUND_WHITENOISE_DURATION_APROMIXATION
 							stream.Overlap = true
 
 							local function remove_stream()
