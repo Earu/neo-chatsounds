@@ -131,14 +131,14 @@ function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 
 				local realm = raw_sound_data[1]:lower()
 				local sound_key = raw_sound_data[2]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " ")
-				local path = encode_sound_path(raw_sound_data[3])
+				local path = raw_sound_data[3]
 
 				if #sound_key > 0 then
 					if not data.Repositories[repo_key].List[sound_key] then
 						data.Repositories[repo_key].List[sound_key] = {}
 					end
 
-					local url = ("https://raw.githubusercontent.com/%s/%s/%s/%s"):format(repo, branch, base_path, path):gsub("%s", "%%20")
+					local url = encode_sound_path(("https://raw.githubusercontent.com/%s/%s/%s/%s"):format(repo, branch, base_path, path)):gsub("%s", "%%20")
 					local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
 					local sound_data = {
 						Url = url,
