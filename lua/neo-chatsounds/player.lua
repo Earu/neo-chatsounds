@@ -315,7 +315,7 @@ if CLIENT then
 			cs_player.Streams[k] = {}
 		end
 
-		--chatsounds.WebAudio.Panic()
+		chatsounds.WebAudio.Panic()
 
 		if run_stop_sound then
 			ignore_next_stop_sound = true
