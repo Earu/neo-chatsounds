@@ -5,6 +5,7 @@
 - [x] chatsounds_enable 0, should also hide suggestions and not compile lists on initialize
 - [x] The last sound of a bunch of sounds does not parse properly
 - [x] Legacy modifiers assigned incorrectly, and arguments too, seems to have to do with waiting for a second char in the parser
+- [ ] Loop modifier does not work
 
 ## Suggestions
 - [x] Ability to load in any sound repository you want? (can be done by server owners with chatsounds/repo_config.json)
