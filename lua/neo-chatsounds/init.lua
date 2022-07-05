@@ -84,10 +84,12 @@ function chatsounds.Reload()
 		end
 
 		AddCSLuaFile("neo-chatsounds/data.lua")
+		AddCSLuaFile("neo-chatsounds/completion.lua")
 		AddCSLuaFile("neo-chatsounds/parser.lua")
 		AddCSLuaFile("neo-chatsounds/player.lua")
 
 		include("neo-chatsounds/data.lua")
+		include("neo-chatsounds/completion.lua")
 		include("neo-chatsounds/parser.lua")
 		include("neo-chatsounds/player.lua")
 	end
