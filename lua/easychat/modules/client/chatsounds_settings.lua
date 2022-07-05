@@ -1,6 +1,7 @@
 local CS_ENABLE = GetConVar("chatsounds_enable")
 local CS_SH_MODE = GetConVar("chatsounds_sh_mode")
 local CS_RUNNER_INTERVAL = GetConVar("chatsounds_runner_interval")
+local CS_HIDE_TEXT = GetConVar("chatsounds_hide_text")
 
 local settings = EasyChat.Settings
 
@@ -8,6 +9,7 @@ local category_name = "Chatsounds"
 settings:AddCategory(category_name)
 
 settings:AddConvarSetting(category_name, "boolean", CS_ENABLE, "Enable chatsounds")
+settings:AddConvarSetting(category_name, "boolean", CS_HIDE_TEXT, "Hide big chatsounds messages")
 
 settings:AddSpacer(category_name)
 

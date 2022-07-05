@@ -10,6 +10,8 @@ local str_trim = _G.string.Trim
 local table_insert = _G.table.insert
 local table_remove = _G.table.remove
 local table_copy = _G.table.Copy
+local table_sort = _G.table.sort
+local table_add = _G.table.Add
 
 local ipairs = _G.ipairs
 local pairs = _G.pairs
@@ -43,7 +45,7 @@ for modifier_name, modifier in pairs(chatsounds.Modifiers) do
 	end
 end
 
-table.sort(legacy_modifiers, function(a, b) return b:len() < a:len() end)
+table_sort(legacy_modifiers, function(a, b) return b:len() < a:len() end)
 
 function parser.ParseSoundTriggers(str)
 	if not str then return {} end
@@ -186,6 +188,15 @@ local function parse_sounds(raw_str, index, ctx)
 	ctx.LastParsedSoundEndIndex = nil
 end
 
+local function process_scope_children(cur_scope)
+	if cur_scope.Sounds then
+		local data_chunks = table_add(cur_scope.Sounds, cur_scope.Children)
+		table_sort(data_chunks, function(a, b) return a.StartIndex < b.StartIndex end)
+		cur_scope.Children = data_chunks
+		cur_scope.Sounds = nil
+	end
+end
+
 local scope_handlers = {
 	["("] = function(raw_str, index, ctx)
 		if ctx.InLuaExpression then return end
@@ -197,6 +208,8 @@ local scope_handlers = {
 
 		local cur_scope = table_remove(ctx.Scopes, #ctx.Scopes)
 		cur_scope.StartIndex = index
+
+		process_scope_children(cur_scope)
 	end,
 	[")"] = function(raw_str, index, ctx)
 		if ctx.InLuaExpression then return end
@@ -259,7 +272,7 @@ local scope_handlers = {
 					StartIndex = index,
 					EndIndex = already_assigned and index + #modifier_name or last_scope_child.EndIndex,
 					Scope = already_assigned and nil or last_scope_child,
-					IsLegacy = false,
+					IsLegacy = str_find(modifier_name, "^legacy_") and true or false,
 				}, { __index = modifier_lookup[modifier_name] })
 
 				if last_scope_child.ExpressionFn then
@@ -280,7 +293,7 @@ local scope_handlers = {
 					StartIndex = index,
 					EndIndex = index + #modifier_name,
 					Value = modifier_lookup[modifier_name].DefaultValue,
-					IsLegacy = false,
+					IsLegacy = str_find(modifier_name, "^legacy_") and true or false,
 				}, { __index = modifier_lookup[modifier_name] })
 
 				end_index = modifier.EndIndex
@@ -318,8 +331,6 @@ local function parse_str(raw_str)
 
 	local global_scope = { -- global parent scope for the string
 		Children = {},
-		Sounds = {},
-		Parent = nil,
 		StartIndex = 1,
 		EndIndex = #raw_str,
 		Type = "group",
@@ -327,7 +338,7 @@ local function parse_str(raw_str)
 	}
 
 	if #str_trim(raw_str) == 0 then
-		return coroutine.yield(global_scope)
+		return chatsounds.Runners.PushValue(global_scope)
 	end
 
 	-- convert legacy modifiers into new ones
@@ -368,10 +379,19 @@ local function parse_str(raw_str)
 	end
 
 	parse_sounds(raw_str, 1, ctx)
+	process_scope_children(global_scope)
 
-	return coroutine.yield(global_scope)
+	return chatsounds.Runners.PushValue(global_scope)
 end
 
 function parser.ParseAsync(raw_str)
 	return chatsounds.Runners.Execute(parse_str, raw_str:lower())
+end
+
+function parser.Parse(raw_str)
+	chatsounds.Runners.SetSynchronous(true)
+	local ret = parse_str(raw_str:lower())
+	chatsounds.Runners.SetSynchronous(false)
+
+	return ret
 end

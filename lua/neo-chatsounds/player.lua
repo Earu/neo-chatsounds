@@ -1,4 +1,5 @@
 local STR_NETWORKING_LIMIT = 60000
+local CONTEXT_SEPARATOR = ";"
 
 if SERVER then
 	util.AddNetworkString("chatsounds")
@@ -252,28 +253,25 @@ if CLIENT then
 			return iters
 		end
 
-		local data_chunks = table.Add(sound_group.Sounds or {}, sound_group.Children)
-		table.sort(data_chunks, function(a, b) return a.StartIndex < b.StartIndex end)
-
-		for _, data_chunk in ipairs(data_chunks) do
+		for _, child in pairs(sound_group.Children) do
 			chatsounds.Runners.Yield()
 
-			if data_chunk.Type == "sound" then
-				local snd_opts = sound_pre_process(data_chunk, false)
+			if child.Type == "sound" then
+				local snd_opts = sound_pre_process(child, false)
 				local snd_iters = add_iters(snd_opts.DuplicateCount)
 				for _ = 1, snd_iters do
 					chatsounds.Runners.Yield()
 
-					data_chunk.Modifiers = table.Add(data_chunk.Modifiers, get_all_modifiers(data_chunk.ParentScope))
-					table.insert(ret, data_chunk)
+					child.Modifiers = table.Add(child.Modifiers, get_all_modifiers(child.ParentScope))
+					table.insert(ret, child)
 				end
-			elseif data_chunk.Type == "group" then
-				local opts = sound_pre_process(data_chunk, true)
+			elseif child.Type == "group" then
+				local opts = sound_pre_process(child, true)
 				local iters = add_iters(opts.DuplicateCount)
 				for _ = 1, iters do
 					chatsounds.Runners.Yield()
 
-					flatten_sounds(data_chunk, ret, total_iters)
+					flatten_sounds(child, ret, total_iters)
 				end
 			end
 		end
@@ -446,8 +444,7 @@ if CLIENT then
 
 								local success, err = pcall(hook.Remove, "Think", hook_name)
 								if not success then
-									PrintTable(stream)
-									print(err)
+									chatsounds.Error("Failed to finish stream " .. hook_name .. ":" .. err)
 								end
 							end
 
@@ -503,7 +500,6 @@ if CLIENT then
 		return finished_task
 	end
 
-	local CONTEXT_SEPARATOR = ";"
 	function cs_player.PlayAsync(ply, text)
 		if text[1] == CONTEXT_SEPARATOR then
 			local t = chatsounds.Tasks.new()
@@ -585,5 +581,85 @@ if CLIENT then
 	-- this is necessary otherwise when using the first sounds with webaudio it just fails to play
 	hook.Add("Initialize", "chatsounds.Player.WebAudio", function()
 		chatsounds.WebAudio.Initialize()
+	end)
+end
+
+if CLIENT then
+	local function get_index_pairs(sound_group, ret)
+		ret = ret or {}
+
+		for _, child in ipairs(sound_group.Children) do
+			if child.Type == "Sound" then
+				local end_index = child.EndIndex
+				if #child.Modifiers > 0 then
+					table.sort(child.Modifiers, function(a, b) return a.StartIndex < b.StartIndex end)
+					end_index = child.Modifiers[#child.Modifiers].EndIndex
+				end
+
+				table.insert(ret, { child.StartIndex, end_index, #child.Key })
+			elseif child.Type == "group" then
+				get_index_pairs(child, ret)
+			end
+		end
+
+		return ret
+	end
+
+	local CS_HIDE_TEXT = CreateConVar("chatsounds_hide_text", "0", FCVAR_ARCHIVE, "Hide the chatsounds text in the chat", 0, 1)
+	local BIG_CS_THRESHOLD = 200
+	local MIN_PERCENTAGE_FOR_HIDING = 95
+	function cs_player.ShouldHideMessage(text)
+		if not chatsounds.Enabled then return false end
+		if chatsounds.Data.Loading then return false end
+
+		if not CS_HIDE_TEXT:GetBool() then return false end
+		if #text < BIG_CS_THRESHOLD then return false end
+
+		if text[1] == CONTEXT_SEPARATOR then return false end
+
+		if chatsounds.Data.Lookup.List[text:Trim()] then return true end -- if we can easily tell its just a sound, remove
+
+		local avg = 0
+		local text_chunks = text:Split(CONTEXT_SEPARATOR)
+		for _, chunk in ipairs(text_chunks) do
+			local original_len = #chunk
+
+			-- remove legacy modifiers to keep indexes from changing
+			local chunk_without_legacy = chunk
+			for _, modifier_base in pairs(chatsounds.Modifiers) do
+				if modifier_base.LegacySyntax then
+					chunk_without_legacy = chunk_without_legacy:gsub(modifier_base.LegacySyntax:PatternSafe() .. "[0-9%.]+", ""):gsub(modifier_base.LegacySyntax:PatternSafe(), "")
+				end
+			end
+
+			local actual_text = ""
+			local index_pairs = get_index_pairs(chatsounds.Parser.Parse(chunk_without_legacy))
+			local prev_index = 1
+			for i = 1, #index_pairs do
+				actual_text = actual_text .. chunk_without_legacy:sub(prev_index, index_pairs[i][1] - 1)
+				prev_index = index_pairs[i][2] + 1
+
+				if index_pairs[i][3] >= BIG_CS_THRESHOLD then
+					return true -- spotted a big sound, don't display
+				end
+			end
+
+			actual_text = actual_text .. chunk_without_legacy:sub(prev_index)
+			actual_text = actual_text:gsub("[%(%):]", ""):Trim()
+
+			avg = avg + (#actual_text / original_len * 100)
+		end
+
+		avg = avg / #text_chunks
+		if avg >= MIN_PERCENTAGE_FOR_HIDING then return true end -- don't display if it's just a bunch of sounds
+
+		return false
+	end
+
+	hook.Add("OnPlayerChat", "chatsounds.Player.StripSounds", function(ply, text)
+		if cs_player.ShouldHideMessage(text) then
+			chat.AddText("Hidden chatsounds message from ", ply)
+			return true
+		end
 	end)
 end
