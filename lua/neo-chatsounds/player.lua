@@ -307,14 +307,15 @@ if CLIENT then
 
 	local ignore_next_stop_sound = false
 	function cs_player.StopAllSounds(run_stop_sound)
-		for _, streams in pairs(cs_player.Streams) do
-			for k, stream in pairs(streams) do
+		for k, streams in pairs(cs_player.Streams) do
+			for _, stream in pairs(streams) do
 				stream:Remove()
-				streams[k] = nil
 			end
+
+			cs_player.Streams[k] = {}
 		end
 
-		chatsounds.WebAudio.Panic()
+		--chatsounds.WebAudio.Panic()
 
 		if run_stop_sound then
 			ignore_next_stop_sound = true
