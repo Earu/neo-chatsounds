@@ -456,22 +456,24 @@ if SERVER then
 	end)
 
 	-- hack to know when we are able to broadcast the config to clients
-	hook.Add("PlayerInitialSpawn", "chatsounds.Data.PlayerFullLoad", function(ply)
-		hook.Add("SetupMove", ply, function(self, ply, _, cmd)
-			if self == ply and not cmd:IsForced() then
-				hook.Run("PlayerFullLoad", self)
-				hook.Remove("SetupMove", self)
-			end
-		end)
+	local ply_to_network = {}
+	hook.Add("PlayerInitialSpawn", "chatsounds.Data.RepoNetworking", function(ply)
+		ply_to_network[ply] = true
 	end)
 
-	hook.Add("PlayerFullLoad", "chatsounds.Data.Config", function(ply)
-		-- wait a bit before networking the config to mitigate config not being received by clients
-		timer.Simple(2, function()
-			net.Start("chatsounds_repos")
-				net.WriteString(data.RepoConfigJson)
-			net.Send(ply)
-		end)
+	hook.Add("SetupMove", "chatsounds.Data.RepoNetworking", function(ply, _, cmd)
+		if ply_to_network[ply] and not cmd:IsForced() then
+			-- wait a bit before networking the config to mitigate config not being received by clients
+			timer.Simple(2, function()
+				if not IsValid(ply) then return end
+
+				net.Start("chatsounds_repos")
+					net.WriteString(data.RepoConfigJson)
+				net.Send(ply)
+			end)
+
+			ply_to_network[ply] = nil
+		end
 	end)
 end
 
