@@ -18,7 +18,7 @@ end
 
 local INDEX_SELECTION_PATTERN = "#(%d+)$"
 local INDEX_SELECTION_NO_ARGS_PATTERN = "#$"
-function MODIFIER.OnCompletion(text, suggestions, added_suggestions)
+function MODIFIER.OnCompletion(text, suggestions, added_suggestions, is_upper_case)
 	local match = text:match(INDEX_SELECTION_PATTERN) or text:match(INDEX_SELECTION_NO_ARGS_PATTERN)
 	if not match then return false end
 
@@ -38,7 +38,11 @@ function MODIFIER.OnCompletion(text, suggestions, added_suggestions)
 		local sound_data = existing_sounds[relative_index]
 		if not added_suggestions[sound_data.Url] then
 			local suggestion = ("%s%s#%d%s"):format(string.sub(text, 1, last_sound.StartIndex - 1), last_sound.Key, relative_index, string.sub(text, last_sound.EndIndex + 1))
-			table.insert(suggestions, { Suggestion = suggestion, Extra = (":realm( %s )"):format(sound_data.Realm) })
+			table.insert(suggestions, {
+				Suggestion = is_upper_case and suggestion:upper() or suggestion,
+				Extra = (":realm( %s )"):format(sound_data.Realm)
+			})
+
 			added_suggestions[sound_data.Url] = true
 		end
 	end
