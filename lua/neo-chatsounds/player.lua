@@ -1,6 +1,8 @@
 local STR_NETWORKING_LIMIT = 60000
 local CONTEXT_SEPARATOR = ";"
 
+local cs_player = chatsounds.Module("Player")
+
 if SERVER then
 	util.AddNetworkString("chatsounds")
 	util.AddNetworkString("chatsounds_cmd")
@@ -82,8 +84,6 @@ if SERVER then
 end
 
 if CLIENT then
-	local cs_player = chatsounds.Module("Player")
-
 	do
 		-- this is a hack to detect stopsound
 		hook.Add("InitPostEntity", "chatsounds.Player.StopSoundHack", function()
