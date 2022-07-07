@@ -168,6 +168,7 @@ function completion.BuildCompletionSuggestions(text)
 	local last_word = search_words[#search_words]
 	local is_upper_case = last_word:upper() == last_word
 
+	text = text:lower()
 	last_word = last_word:lower()
 
 	for _, modifier_base in pairs(chatsounds.Modifiers) do
