@@ -81,7 +81,7 @@ end)
 
 local MODIFIER_PATTERN = ":([%w_]+)[%[%]%(%w%s,%.]*$"
 local MODIFIER_ARGS_PATTERN = ":[%w_]+%(([%[%]%w%s,%.]*)$"
-local function process_modifier_completion(text, suggestions, added_suggestions)
+local function process_modifier_completion(text, suggestions, added_suggestions, is_upper_case)
 	local modifier = text:match(MODIFIER_PATTERN)
 	local arguments = text:match(MODIFIER_ARGS_PATTERN)
 	if modifier then
@@ -91,7 +91,8 @@ local function process_modifier_completion(text, suggestions, added_suggestions)
 		if not arguments then
 			for name, _ in pairs(chatsounds.Modifiers) do
 				if name:StartWith(modifier) and not added_suggestions[name] then
-					table.insert(suggestions, ("%s:%s"):format(without_modifier, name))
+					local suggestion = ("%s:%s"):format(without_modifier, name)
+					table.insert(suggestions, is_upper_case and suggestion:upper() or suggestion)
 					added_suggestions[name] = true
 				end
 			end
@@ -128,7 +129,8 @@ local function process_modifier_completion(text, suggestions, added_suggestions)
 				suggest_arguments = ("%s[%s]"):format(suggest_arguments, type(mod.DefaultValue))
 			end
 
-			table.insert(suggestions, ("%s:%s(%s)"):format(without_modifier, modifier, suggest_arguments))
+			local suggestion = ("%s:%s(%s)"):format(without_modifier, modifier, suggest_arguments)
+			table.insert(suggestions, is_upper_case and suggestion:upper() or suggestion)
 		end
 
 		return true
@@ -137,16 +139,16 @@ local function process_modifier_completion(text, suggestions, added_suggestions)
 	return false
 end
 
-local function add_nested_suggestions(node, text, nested_suggestions, added_suggestions)
+local function add_nested_suggestions(node, text, nested_suggestions, added_suggestions, is_upper_case)
 	for _, sound_key in ipairs(node.Sounds) do
 		if sound_key:find(text, 1, true) and not added_suggestions[sound_key] then
-			table.insert(nested_suggestions, sound_key)
+			table.insert(nested_suggestions, is_upper_case and sound_key:upper() or sound_key)
 			added_suggestions[sound_key] = true
 		end
 	end
 
 	for key, child_node in pairs(node.Keys) do
-		add_nested_suggestions(child_node, text, nested_suggestions, added_suggestions)
+		add_nested_suggestions(child_node, text, nested_suggestions, added_suggestions, is_upper_case)
 	end
 end
 
@@ -164,10 +166,13 @@ function completion.BuildCompletionSuggestions(text)
 
 	local search_words = text:Split(" ")
 	local last_word = search_words[#search_words]
+	local is_upper_case = last_word:upper() == last_word
+
+	last_word = last_word:lower()
 
 	for _, modifier_base in pairs(chatsounds.Modifiers) do
 		if modifier_base.OnCompletion then
-			local ret = modifier_base.OnCompletion(text, suggestions, added_suggestions)
+			local ret = modifier_base.OnCompletion(text, suggestions, added_suggestions, is_upper_case)
 			if ret then
 				completion.Suggestions = suggestions
 				completion.SuggestionsIndex = -1
@@ -176,7 +181,7 @@ function completion.BuildCompletionSuggestions(text)
 		end
 	end
 
-	local processed = process_modifier_completion(text, suggestions, added_suggestions)
+	local processed = process_modifier_completion(text, suggestions, added_suggestions, is_upper_case)
 	if processed then
 		completion.Suggestions = suggestions
 		completion.SuggestionsIndex = -1
@@ -199,7 +204,7 @@ function completion.BuildCompletionSuggestions(text)
 			sounds = node.Sounds
 
 			for _, child_node in pairs(node.Keys) do
-				add_nested_suggestions(child_node, text, suggestions, added_suggestions)
+				add_nested_suggestions(child_node, text, suggestions, added_suggestions, is_upper_case)
 			end
 		else
 			sounds = node.Sounds
@@ -208,7 +213,7 @@ function completion.BuildCompletionSuggestions(text)
 
 	for _, sound_key in ipairs(sounds) do
 		if sound_key:find(text, 1, true) and not added_suggestions[sound_key] then
-			table.insert(suggestions, sound_key)
+			table.insert(suggestions, is_upper_case and sound_key:upper() or sound_key)
 			added_suggestions[sound_key] = true
 		end
 	end
