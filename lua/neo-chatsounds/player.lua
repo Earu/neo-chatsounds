@@ -282,21 +282,23 @@ if CLIENT then
 	local WEBAUDIO_TIMEOUT = 10
 	local function prepare_stream(snd, task)
 		local stream = chatsounds.WebAudio.CreateStream("data/" .. snd.Path)
-
+		local hook_name = ("chatsounds_stream_loading_%s"):format(stream:GetId())
 		local done = false
 		timer.Simple(WEBAUDIO_TIMEOUT, function()
 			if done then return end
-			if not stream:IsReady() then
-				hook.Remove("Think", stream)
-				task:reject(("WebAudio Timeout %s\nIf this happens a lot please do chatsounds_reload!"):format(snd.Url))
-			end
+			if stream:IsReady() then return end
+
+			done = true
+			hook.Remove("Think", hook_name)
+			task:reject(("WebAudio Timeout %s\nIf this happens a lot please do chatsounds_reload!"):format(snd.Url))
 		end)
 
-		hook.Add("Think", stream, function()
+		hook.Add("Think", hook_name, function()
+			if done then return end
 			if not stream:IsReady() then return end
 
 			done = true
-			hook.Remove("Think", stream)
+			hook.Remove("Think", hook_name)
 			task:resolve()
 		end)
 
