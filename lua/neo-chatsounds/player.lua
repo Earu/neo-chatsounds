@@ -469,6 +469,11 @@ if CLIENT then
 								timer.Simple(stream:GetLength() + 1, remove_stream)
 							end
 
+							if chatsounds.Blacklist.IsSoundBlocked(sound_data.Key, _sound) then
+								remove_stream()
+								return
+							end
+
 							stream:Play()
 							started = true
 							hook.Run("ChatsoundsSoundInit", ply, _sound, stream, sound_data)

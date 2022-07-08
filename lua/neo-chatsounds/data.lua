@@ -378,6 +378,7 @@ local function merge_repos(rebuild_dynamic_lookup)
 					chatsounds.Runners.Yield()
 
 					if not urls[sound_data.Url] then
+						sound_data.Repository = repo
 						table.insert(lookup.List[sound_key], sound_data)
 						urls[sound_data.Url] = true
 
