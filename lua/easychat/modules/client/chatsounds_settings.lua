@@ -204,7 +204,7 @@ do
 		end
 	end
 
-	build_block_lists()
+	hook.Add("ECSettingsOpened", blocked_sounds_list, build_block_lists)
 	hook.Add("ChatsoundsBlacklistUpdated", blocked_sounds_list, build_block_lists)
 end
 
