@@ -75,6 +75,7 @@ function blacklist.Update(is_block, block_type, ...)
 		return false, ("Invalid block type \'%s\', valid blocktypes are: repository, realm, sound"):format(block_type)
 	end
 
+	hook.Run("ChatsoundsBlacklistUpdated", is_block, block_type, ...)
 	blacklist.SaveConfig()
 	return true
 end
