@@ -113,6 +113,7 @@ do
 
 		frame:SetTall(110)
 		frame.SoundIndex = frame:Add("DNumberWang")
+		frame.SoundIndex:SetMin(1)
 		frame.SoundIndex:SetValue(1)
 		frame.SoundIndex:Dock(FILL)
 	end
