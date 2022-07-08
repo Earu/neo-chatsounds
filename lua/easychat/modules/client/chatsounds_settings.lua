@@ -210,6 +210,11 @@ end
 
 settings:AddSpacer(category_name)
 
+local setting_clear_cache_lists = settings:AddSetting(category_name, "action", "Clear sound cache")
+setting_clear_cache_lists.DoClick = function()
+	RunConsoleCommand("chatsounds_clear_cache")
+end
+
 local setting_re_merge_lists = settings:AddSetting(category_name, "action", "Re-merge lists")
 setting_re_merge_lists.DoClick = function()
 	RunConsoleCommand("chatsounds_recompile_lists")
