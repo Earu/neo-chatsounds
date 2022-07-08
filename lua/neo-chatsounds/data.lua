@@ -599,8 +599,8 @@ end
 
 concommand.Add("chatsounds_recompile_lists", function()
 	data.CompileLists()
-end)
+end, nil, "Recompiles chatsounds lists lazily")
 
 concommand.Add("chatsounds_recompile_lists_full", function()
 	data.CompileLists(true)
-end)
+end, nil, "Fully recompile all chatsounds lists")

@@ -553,11 +553,11 @@ if CLIENT then
 
 	concommand.Add("saysound", function(ply, _, _, str)
 		handler(ply, str)
-	end)
+	end, nil, "Plays chatsounds")
 
 	concommand.Add("chatsounds_say", function(ply, _, _, str)
 		handler(ply, str)
-	end)
+	end, nil, "Plays chatsounds")
 
 	concommand.Add("chatsounds_local_say", function(ply, _, _, str)
 		if not chatsounds.Enabled then return end
@@ -568,7 +568,7 @@ if CLIENT then
 				chatsounds.Error(err)
 			end
 		end)
-	end)
+	end, nil, "Plays chatsounds only for you")
 
 	net.Receive("chatsounds", function()
 		if not chatsounds.Enabled then return end
