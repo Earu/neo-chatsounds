@@ -2,7 +2,7 @@ if not CLIENT then return end
 
 local blacklist = chatsounds.Module("Blacklist")
 
-blacklist.Config = {
+blacklist.Config = blacklist.Config or {
 	Repositories = {},
 	Realms = {},
 	Sounds = {},
@@ -14,6 +14,8 @@ function blacklist.LoadConfig()
 	local json = file.Read("chatsounds/blacklist.json", "DATA") or ""
 	blacklist.Config = chatsounds.Json.decode(json)
 end
+
+blacklist.LoadConfig()
 
 function blacklist.SaveConfig()
 	local json = chatsounds.Json.encode(blacklist.Config)
@@ -27,14 +29,14 @@ function blacklist.Update(is_block, block_type, ...)
 	if block_type == "repository" or block_type == "repo" then
 		local repo = table.concat(args, ""):Trim():lower()
 		if #repo == 0 then
-			return false, ("Invalid repository name, Proper syntax is: %s repo <repository name>"):format(is_block and "chatsounds_block" or "chatsounds_unblock")
+			return false, ("Invalid repository name. Proper syntax is: %s repo <repository name>"):format(is_block and "chatsounds_block" or "chatsounds_unblock")
 		end
 
 		blacklist.Config.Repositories[repo] = is_block and true or nil
 	elseif block_type == "realm" then
 		local realm = table.concat(args, ""):Trim():lower()
 		if #realm == 0 then
-			return false, ("Invalid realm name, Proper syntax is: %s realm <realm>"):format(is_block and "chatsounds_block" or "chatsounds_unblock")
+			return false, ("Invalid realm name. Proper syntax is: %s realm <realm>"):format(is_block and "chatsounds_block" or "chatsounds_unblock")
 		end
 
 		blacklist.Config.Realms[realm] = is_block and true or nil
@@ -49,21 +51,26 @@ function blacklist.Update(is_block, block_type, ...)
 			return false, ("Invalid sound key. Proper syntax is: %s sound <sound_index> <sound_key>"):format(is_block and "chatsounds_block" or "chatsounds_unblock")
 		end
 
-		if is_block then
+		local existing_sounds = chatsounds.Data.Lookup.List[sound_key]
+		if not existing_sounds then
+			return false, "Invalid sound key, sound does not exist"
+		end
+
+		local sound_data = existing_sounds[sound_index]
+		if not sound_data then
+			return false, "Invalid sound index, sound does not exist"
+		end
+
+		if not is_block then
 			if not blacklist.Config.Sounds[sound_key] then
 				return false, "Sound key isn't blocked"
 			end
 
-			blacklist.Config.Sounds[sound_key][sound_index] = nil
+			blacklist.Config.Sounds[sound_key][sound_data.Path] = nil
 			if table.Count(blacklist.Config.Sounds[sound_key]) == 0 then
 				blacklist.Config.Sounds[sound_key] = nil
 			end
 		else
-			local sound_data = chatsounds.Data.Lookup.List[sound_key]
-			if not sound_data then
-				return false, "Invalid sound key, sound does not exist"
-			end
-
 			if not blacklist.Config.Sounds[sound_key] then
 				blacklist.Config.Sounds[sound_key] = {}
 			end
@@ -100,9 +107,9 @@ local function command_completion(cmd, str_args)
 	local suggestions = {}
 	local args = str_args:Trim():Split(" ")
 	if #args == 1 or #str_args:Trim() == 0 then
-		table.insert(suggestions, cmd .. " repository")
-		table.insert(suggestions, cmd .. " realm")
-		table.insert(suggestions, cmd .. " sound")
+		table.insert(suggestions, ("%s repository"):format(cmd))
+		table.insert(suggestions, ("%s realm"):format(cmd))
+		table.insert(suggestions, ("%s sound"):format(cmd))
 	elseif args[1] == "repository" or args[1] == "repo"  then
 		local repos = table.GetKeys(chatsounds.Data.Repositories)
 		for _, repo in ipairs(repos) do
