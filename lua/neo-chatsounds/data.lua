@@ -597,10 +597,31 @@ if not concommand.GetTable().chatsounds_recompile_lists then
 	}
 end
 
+local function delete_folder_recursive(path)
+	local files, folders = file.Find(path .. "/*", "DATA")
+
+	for _, f in ipairs(files) do
+		file.Delete(path .. "/" .. f)
+	end
+
+	for _, folder in ipairs(folders) do
+		delete_folder_recursive(path .. "/" .. folder, "DATA")
+	end
+
+	file.Delete(path)
+end
+
 concommand.Add("chatsounds_recompile_lists", function()
 	data.CompileLists()
+	delete_folder_recursive("chatsounds/cache")
 end, nil, "Recompiles chatsounds lists lazily")
 
 concommand.Add("chatsounds_recompile_lists_full", function()
 	data.CompileLists(true)
+	delete_folder_recursive("chatsounds/cache")
 end, nil, "Fully recompile all chatsounds lists")
+
+concommand.Add("chatsounds_clear_cache", function()
+	delete_folder_recursive("chatsounds/cache")
+	chatsounds.Log("Cleared cache!")
+end, nil, "Clears the chatsounds sounds cache")
