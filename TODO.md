@@ -6,11 +6,13 @@
 - [x] The last sound of a bunch of sounds does not parse properly
 - [x] Legacy modifiers assigned incorrectly, and arguments too, seems to have to do with waiting for a second char in the parser
 - [ ] Loop modifier does not work
+- [ ] FFT data from chatsounds streams
+- [ ] Face flexes when saying sounds based on FFT data
 
 ## Suggestions
 - [x] Ability to load in any sound repository you want? (can be done by server owners with chatsounds/repo_config.json)
 - [x] Hide away big messages with only/mostly sounds from the chat
-- [ ] Proper realm/sound blocking features?
+- [x] Proper realm/sound blocking features?
 - [ ] Stacking modifiers ? e.g world--50--50 becomes --25 internally?
 - [x] Completion that completes your currently typed modifier
 - [x] Completion that shows the realm you are selecting with #/select modifier
