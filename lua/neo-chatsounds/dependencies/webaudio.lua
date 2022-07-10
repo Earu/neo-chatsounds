@@ -1121,5 +1121,4 @@ function webaudio.StreamExists(streamId)
 	return webaudio.streams[streamId] ~= nil
 end
 
-chatsounds.WebAudio = webaudio
 return webaudio
