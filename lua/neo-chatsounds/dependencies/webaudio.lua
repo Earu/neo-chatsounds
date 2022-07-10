@@ -179,7 +179,7 @@ function webaudio.Initialize()
 	end
 
 	webaudio.browser_panel:AddFunction("lua", "print", dprint)
-	webaudio.browser_panel:AddFunction("lua", "message", function(typ, ...)
+	webaudio.browser_panel:AddFunction("lua", "message", function(msg_type, ...)
 		local args = {...}
 
 		local strs = {}
@@ -187,19 +187,34 @@ function webaudio.Initialize()
 			strs[i] = tostring(arg)
 		end
 
-		dprint(typ .. " " .. table.concat(strs, ", "))
+		dprint(msg_type .. " " .. table.concat(strs, ", "))
 
-		if typ == "initialized" then
+		if msg_type == "initialized" then
 			webaudio.browser_state = "initialized"
 			webaudio.sample_rate = args[1] or -1
 
 			if webaudio.sample_rate and webaudio.sample_rate > 48000 then
 				logn("Your sample rate set to " .. webaudio.sample_rate .. " Hz. Set it to 48000 or below if you experience any issues.")
 			end
-		elseif typ == "stream" then
+		elseif msg_type == "stream" then
 			local stream = webaudio.GetStream(tonumber(args[2]) or 0)
 			if stream:IsValid() then
 				stream:HandleBrowserMessage(args[1], unpack(args, 3, table.maxn(args)))
+			end
+		elseif msg_type == "stream_buffer" then
+			local stream_chunks = args[1]:Split(";")
+			for _, chunk in ipairs(stream_chunks) do
+				local chunk_data = chunk:Split("|")
+				local stream = webaudio.GetStream(tonumber(chunk_data[1]) or 0)
+				if stream:IsValid() and stream.OnAudioBuffer then
+					local buffer = {}
+					local buffer_data = chunk_data[2]:Split(",")
+					for _, data in ipairs(buffer_data) do
+						table.insert(buffer, tonumber(data) or 0)
+					end
+
+					stream:OnAudioBuffer(buffer)
+				end
 			end
 		end
 	end)
@@ -222,6 +237,38 @@ function webaudio.Initialize()
 		var processor;
 		var streams = new Object();
 		var streams_array = [];
+		var stream_audio_buffers = [];
+
+		function on_audio_buffers_broadcast() {
+			var s = "";
+			var first_stream_iter = true;
+			for (var stream_id in stream_audio_buffers) {
+				if (first_stream_iter) {
+					first_stream_iter = false;
+					s += stream_id + "|";
+				} else {
+					s += ";" + stream_id + "|";
+				}
+
+				for (var buffer_index = 0; buffer_index < webaudio.buffer_size; buffer_index++) {
+					var buffer_float = 0;
+					if (buffer_index < stream_audio_buffers[stream_id].length) {
+						buffer_float = stream_audio_buffers[stream_id][buffer_index];
+					}
+
+					if (buffer_index === 0) {
+						s += buffer_float;
+					} else {
+						s += "," + buffer_float;
+					}
+				}
+			}
+
+			lua.message("stream_buffer", s);
+			setTimeout(on_audio_buffers_broadcast, 50);
+		}
+
+		//setTimeout(on_audio_buffers_broadcast, 50);
 
 		function open() {
 			if (audio) {
@@ -290,6 +337,7 @@ function webaudio.Initialize()
 					var sml = 0;
 					var smr = 0;
 
+					var stream_audio_buffer = [];
 					for (var j = 0; j < event.outputBuffer.length; ++j) {
 						if (
 							stream.paused ||
@@ -303,6 +351,7 @@ function webaudio.Initialize()
 							}
 
 							if (!stream.use_echo) {
+								stream_audio_buffer[j] = 0;
 								break;
 							}
 						} else {
@@ -389,7 +438,11 @@ function webaudio.Initialize()
 						if (!isFinite(output_right[j])) {
 							output_right[j] = 0;
 						}
+
+						stream_audio_buffer[j] = (output_left[j] + output_right[j]) * 0.5;
 					}
+
+					stream_audio_buffers[stream.id] = stream_audio_buffer;
 				}
 			};
 
@@ -553,12 +606,12 @@ function webaudio.Initialize()
 
 		function DestroyStream(id) {
 			var stream = streams[id];
-
 			if (stream) {
 				dprint("destroying stream[" + id + "][" + stream.url + "]");
 
 				delete streams[id];
 				delete buffer_cache[stream.url];
+				delete stream_audio_buffers[id];
 
 				var i = streams_array.indexOf(stream);
 				streams_array.splice(i, 1);
@@ -728,8 +781,6 @@ do
 	function META:HandleBrowserMessage(t, ...)
 		if t == "call" then
 			self:HandleCallBrowserMessage(...)
-		elseif t == "fft" then
-			self:HandleFFTBrowserMessage(...)
 		elseif t == "stop" then
 			self.Paused = true
 		elseif t == "return" then
@@ -981,13 +1032,13 @@ do
 	end
 
 	function META:__newindex(key, val)
-		if key == "OnFFT" then
+		--[[if key == "OnFFT" then
 			if type(val) == "function" then
 				self:Call(".usefft(true)")
 			else
 				self:Call(".usefft(false)")
 			end
-		end
+		end]]--
 
 		rawset(self, key, val)
 	end
@@ -1001,11 +1052,6 @@ do
 		if not self[methodName] then return end
 
 		self[methodName](self, ...)
-	end
-
-	function META:HandleFFTBrowserMessage(serializeFFTData)
-		local fftArray = CompileString(serializeFFTData, "stream_fft_data")()
-		self.OnFFT(fftArray)
 	end
 
 	function META:HandleLoadedBrowserMessage(sampleCount)
@@ -1075,4 +1121,5 @@ function webaudio.StreamExists(streamId)
 	return webaudio.streams[streamId] ~= nil
 end
 
+chatsounds.WebAudio = webaudio
 return webaudio
