@@ -6,8 +6,10 @@
 - [x] The last sound of a bunch of sounds does not parse properly
 - [x] Legacy modifiers assigned incorrectly, and arguments too, seems to have to do with waiting for a second char in the parser
 - [ ] Loop modifier does not work
-- [ ] FFT data from chatsounds streams
+- [x] FFT data from chatsounds streams
 - [ ] Face flexes when saying sounds based on FFT data
+- [ ] nya#1%10 <- Stream cuts early, fix pitch down not changing duration
+- [ ] :pitch(\[sin(t()*100)\]), the * in lua expressions is converted to :legacy_rep internally which breaks multiplications
 
 ## Suggestions
 - [x] Ability to load in any sound repository you want? (can be done by server owners with chatsounds/repo_config.json)
