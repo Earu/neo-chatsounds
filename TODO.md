@@ -10,6 +10,7 @@
 - [ ] Face flexes when saying sounds based on FFT data
 - [ ] nya#1%10 <- Stream cuts early, fix pitch down not changing duration
 - [ ] :pitch(\[sin(t()*100)\]), the * in lua expressions is converted to :legacy_rep internally which breaks multiplications
+- [ ] circular reference in json when recompiling all lists fully
 
 ## Suggestions
 - [x] Ability to load in any sound repository you want? (can be done by server owners with chatsounds/repo_config.json)
