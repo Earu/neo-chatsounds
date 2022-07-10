@@ -422,6 +422,12 @@ if CLIENT then
 						stream.IsValid = function() return false end
 					end
 
+					--[[function stream:OnAudioBuffer(audio_buffer)
+						local outRe, outIm = chatsounds.FFT(audio_buffer)
+						--print("OnAudioBuffer", outRe, outIm)
+						print(outRe[1], outIm[1])
+					end]]--
+
 					local started = false
 					local hook_name = ("chatsounds_stream_%s"):format(stream:GetId())
 					hook.Add("Think", hook_name, function()
