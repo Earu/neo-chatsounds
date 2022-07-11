@@ -29,11 +29,8 @@ function MODIFIER:GetValue()
 end
 
 function MODIFIER:OnStreamInit(stream)
-	if not stream.Duration then
-		stream.Duration = stream:GetLength()
-	end
-
 	stream.Duration = stream.Duration / math.abs(self:GetValue())
+	stream.Overlap = false
 end
 
 function MODIFIER:OnStreamThink(stream)

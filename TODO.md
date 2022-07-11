@@ -8,7 +8,7 @@
 - [ ] Loop modifier does not work
 - [x] FFT data from chatsounds streams
 - [ ] Face flexes when saying sounds based on FFT data
-- [ ] nya#1%10 <- Stream cuts early, fix pitch down not changing duration
+- [x] nya#1%10 <- Stream cuts early, fix pitch down not changing duration
 - [ ] :pitch(\[sin(t()*100)\]), the * in lua expressions is converted to :legacy_rep internally which breaks multiplications
 - [x] circular reference in json when recompiling all lists fully
 
