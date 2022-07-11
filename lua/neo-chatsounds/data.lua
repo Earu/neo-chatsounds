@@ -367,7 +367,7 @@ local function merge_repos(rebuild_dynamic_lookup)
 		end
 
 		local existing_node_sounds = {}
-		for _, repo in pairs(data.Repositories) do
+		for repo_name, repo in pairs(data.Repositories) do
 			for sound_key, sound_list in pairs(repo.List) do
 				if not lookup.List[sound_key] then
 					lookup.List[sound_key] = {}
@@ -378,7 +378,7 @@ local function merge_repos(rebuild_dynamic_lookup)
 					chatsounds.Runners.Yield()
 
 					if not urls[sound_data.Url] then
-						sound_data.Repository = repo
+						sound_data.Repository = repo_name
 						table.insert(lookup.List[sound_key], sound_data)
 						urls[sound_data.Url] = true
 
