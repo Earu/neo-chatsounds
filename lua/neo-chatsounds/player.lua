@@ -95,7 +95,7 @@ if CLIENT then
 					snd = CreateSound(LocalPlayer(), "phx/hmetal1.wav")
 					snd:PlayEx(0, 100)
 
-					hook.Run("StopSound")
+					hook.Run("ChatsoundsStopSound")
 				end
 			end)
 		end)
@@ -325,7 +325,7 @@ if CLIENT then
 		end
 	end
 
-	hook.Add("StopSound", "chatsounds.Player.StopSound", function()
+	hook.Add("ChatsoundsStopSound", "chatsounds.Player.StopSound", function()
 		if ignore_next_stop_sound then
 			ignore_next_stop_sound = false
 			return
