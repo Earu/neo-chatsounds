@@ -35,9 +35,13 @@ function chatsounds.Reload()
 		metalog.error("neo-chatsounds", CLIENT and "Client" or "Server", err)
 	end
 
-	local CS_ENABLE = CreateConVar("chatsounds_enable", "1", FCVAR_ARCHIVE, "Enables/disables chatsounds", 0, 1)
+	-- we create a different convar for the server because it breaks in p2p and singleplayer otherwise
+	local CS_ENABLE = SERVER
+		and CreateConVar("chatsounds_enable_sv", "1", FCVAR_ARCHIVE, "Enables/disables chatsounds", 0, 1)
+		or CreateConVar("chatsounds_enable", "1", FCVAR_ARCHIVE, "Enables/disables chatsounds", 0, 1)
+
 	chatsounds.Enabled = CS_ENABLE:GetBool()
-	cvars.AddChangeCallback("chatsounds_enable", function()
+	cvars.AddChangeCallback(CS_ENABLE:GetName(), function()
 		chatsounds.Enabled = CS_ENABLE:GetBool()
 	end)
 
