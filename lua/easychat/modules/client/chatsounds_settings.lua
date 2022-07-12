@@ -169,7 +169,7 @@ do
 
 	local setting_unblock_repos = settings:AddSetting(category_name, "action", "Unblock repository(ies)")
 	setting_unblock_repos.DoClick = function()
-		local selected_lines = setting_unblock_repos:GetSelected()
+		local selected_lines = blocked_repos_list:GetSelected()
 		for _, selected_line in pairs(selected_lines) do
 			local repo_name = selected_line:GetColumnText(1)
 			chatsounds.Blacklist.Update(false, "repository", repo_name)
