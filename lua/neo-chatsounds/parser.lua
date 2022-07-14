@@ -315,6 +315,15 @@ local scope_handlers = {
 		ctx.InLuaExpression = false
 
 		local lua_str = str_sub(raw_str, index + 1, ctx.LuaStringEndIndex)
+
+		-- this is necessary to restore legacy modifier that were transformed to lua syntax
+		lua_str = str_gsub(lua_str, "%:legacy%_([a-z]+)%((.+)%)", function(modifier_name, args)
+			local modifier = modifier_lookup["legacy_" .. modifier_name]
+			if not modifier then return "" end
+
+			return modifier.LegacySyntax .. args
+		end)
+
 		local cur_scope = ctx.Scopes[#ctx.Scopes]
 		local fn = chatsounds.Expressions.Compile(lua_str, "chatsounds_parser_lua_string")
 
