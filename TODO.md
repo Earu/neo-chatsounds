@@ -11,6 +11,7 @@
 - [x] nya#1%10 <- Stream cuts early, fix pitch down not changing duration
 - [x] :pitch(\[sin(t()*100)\]), the * in lua expressions is converted to :legacy_rep internally which breaks multiplications
 - [x] circular reference in json when recompiling all lists fully
+- [ ] indexes returned by the parser will be wrong if legacy modifier syntax is introduced
 
 ## Suggestions
 - [x] Ability to load in any sound repository you want? (can be done by server owners with chatsounds/repo_config.json)
