@@ -422,16 +422,17 @@ if CLIENT then
 						stream.IsValid = function() return false end
 					end
 
+					local stream_id = stream:GetId()
 					--[[function stream:OnAudioBuffer(audio_buffer)
-						local outRe, outIm = chatsounds.FFT(audio_buffer)
-						--print("OnAudioBuffer", outRe, outIm)
-						print(outRe[1], outIm[1])
-					end]]--
+						if not self:IsValid() then return end
+
+						chatsounds.Flexes.PushStreamBuffer(ply, stream_id, audio_buffer)
+					end]]
 
 					local started = false
-					local hook_name = ("chatsounds_stream_%s"):format(stream:GetId())
+					local hook_name = ("chatsounds_stream_%s"):format(stream_id)
 					hook.Add("Think", hook_name, function()
-						if not IsValid(ply) or not IsValid(stream) then
+						if not IsValid(ply) or not stream:IsValid() then
 							if not started then
 								sound_task:resolve()
 							end
@@ -447,7 +448,8 @@ if CLIENT then
 							stream.Overlap = true
 
 							local function remove_stream()
-								if IsValid(stream) then
+								if stream:IsValid() then
+									--chatsounds.Flexes.MarkForDeletion(ply, stream_id)
 									stream:Remove()
 								end
 
