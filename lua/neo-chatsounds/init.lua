@@ -52,11 +52,9 @@ function chatsounds.Reload()
 		AddCSLuaFile("neo-chatsounds/dependencies/tasks.lua")
 		AddCSLuaFile("neo-chatsounds/dependencies/json.lua")
 		AddCSLuaFile("neo-chatsounds/dependencies/msgpack.lua")
-		--AddCSLuaFile("neo-chatsounds/dependencies/zfft.lua")
 
 		if CLIENT then
 			chatsounds.WebAudio = include("neo-chatsounds/dependencies/webaudio.lua")
-			--chatsounds.FFT = include("neo-chatsounds/dependencies/zfft.lua").fft
 		end
 
 		chatsounds.Tasks = include("neo-chatsounds/dependencies/tasks.lua")
@@ -94,12 +92,14 @@ function chatsounds.Reload()
 		AddCSLuaFile("neo-chatsounds/parser.lua")
 		AddCSLuaFile("neo-chatsounds/player.lua")
 		AddCSLuaFile("neo-chatsounds/blacklist.lua")
+		AddCSLuaFile("neo-chatsounds/flexes.lua")
 
 		include("neo-chatsounds/data.lua")
 		include("neo-chatsounds/completion.lua")
 		include("neo-chatsounds/parser.lua")
 		include("neo-chatsounds/player.lua")
 		include("neo-chatsounds/blacklist.lua")
+		include("neo-chatsounds/flexes.lua")
 	end
 end
 
