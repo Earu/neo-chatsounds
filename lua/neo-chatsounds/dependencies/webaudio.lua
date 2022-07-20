@@ -268,7 +268,7 @@ function webaudio.Initialize()
 			setTimeout(on_audio_buffers_broadcast, 25);
 		}
 
-		//setTimeout(on_audio_buffers_broadcast, 25);
+		setTimeout(on_audio_buffers_broadcast, 25);
 
 		function open() {
 			if (audio) {
@@ -351,7 +351,10 @@ function webaudio.Initialize()
 							}
 
 							if (!stream.use_echo) {
-								stream_audio_buffer[j] = 0;
+								if (stream.broadcast_buffer) {
+									stream_audio_buffer[j] = 0;
+								}
+
 								break;
 							}
 						} else {
@@ -439,10 +442,14 @@ function webaudio.Initialize()
 							output_right[j] = 0;
 						}
 
-						stream_audio_buffer[j] = (output_left[j] + output_right[j]) * 0.5;
+						if (stream.broadcast_buffer) {
+							stream_audio_buffer[j] = (output_left[j] + output_right[j]) * 0.5;
+						}
 					}
 
-					stream_audio_buffers[stream.id] = stream_audio_buffer;
+					if (stream.broadcast_buffer) {
+						stream_audio_buffers[stream.id] = stream_audio_buffer;
+					}
 				}
 			};
 
@@ -537,6 +544,7 @@ function webaudio.Initialize()
 					stream.filter_type = 0;
 					stream.filter_fraction = 1;
 					stream.done_playing = false;
+					stream.broadcast_buffer = false;
 
 					stream.use_echo = false;
 					stream.echo_feedback = 0.75;
@@ -555,8 +563,8 @@ function webaudio.Initialize()
 						stream.paused = !stop;
 					};
 
-					stream.usefft = function(enable) {
-						// later
+					stream.broadcastBuffer = function(enable) {
+						stream.broadcast_buffer = enable;
 					};
 
 					stream.useEcho = function(b) {
@@ -1032,13 +1040,13 @@ do
 	end
 
 	function META:__newindex(key, val)
-		--[[if key == "OnFFT" then
+		if key == "OnAudioBuffer" then
 			if type(val) == "function" then
-				self:Call(".usefft(true)")
+				self:Call(".broadcastBuffer(true)")
 			else
-				self:Call(".usefft(false)")
+				self:Call(".broadcastBuffer(false)")
 			end
-		end]]--
+		end
 
 		rawset(self, key, val)
 	end

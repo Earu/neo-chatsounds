@@ -347,6 +347,12 @@ if CLIENT then
 		end
 	end
 
+	local CS_MOUTH_FLEXES = CreateConVar("chatsounds_mouth_flexes", "1", FCVAR_ARCHIVE, "Make the player model mouths flex when speaking")
+	cvars.RemoveChangeCallback(CS_MOUTH_FLEXES:GetName(), "chatsounds.Flexes")
+	cvars.AddChangeCallback(CS_MOUTH_FLEXES:GetName(), function()
+		table.Empty(chatsounds.Flexes.Amplitudes)
+	end, "chatsounds.Flexes")
+
 	local SOUND_WHITENOISE_DURATION_APROMIXATION = 0.075
 	function cs_player.PlaySoundGroupAsync(ply, sound_group)
 		local finished_task = chatsounds.Tasks.new()
@@ -423,11 +429,13 @@ if CLIENT then
 					end
 
 					local stream_id = stream:GetId()
-					--[[function stream:OnAudioBuffer(audio_buffer)
-						if not self:IsValid() then return end
+					if CS_MOUTH_FLEXES:GetBool() then
+						function stream:OnAudioBuffer(audio_buffer)
+							if not self:IsValid() then return end
 
-						chatsounds.Flexes.PushStreamBuffer(ply, stream_id, audio_buffer)
-					end]]
+							chatsounds.Flexes.PushStreamBuffer(ply, stream_id, audio_buffer)
+						end
+					end
 
 					local started = false
 					local hook_name = ("chatsounds_stream_%s"):format(stream_id)
@@ -449,7 +457,7 @@ if CLIENT then
 
 							local function remove_stream()
 								if stream:IsValid() then
-									--chatsounds.Flexes.MarkForDeletion(ply, stream_id)
+									chatsounds.Flexes.MarkForDeletion(ply, stream_id)
 									stream:Remove()
 								end
 
