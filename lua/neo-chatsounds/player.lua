@@ -347,7 +347,7 @@ if CLIENT then
 		end
 	end
 
-	local CS_MOUTH_FLEXES = CreateConVar("chatsounds_mouth_flexes", "1", FCVAR_ARCHIVE, "Make the player model mouths flex when speaking")
+	local CS_MOUTH_FLEXES = CreateConVar("chatsounds_mouth_flexes", "0", FCVAR_ARCHIVE, "Make the player model mouths flex when speaking (EXPERIMENTAL)")
 	cvars.RemoveChangeCallback(CS_MOUTH_FLEXES:GetName(), "chatsounds.Flexes")
 	cvars.AddChangeCallback(CS_MOUTH_FLEXES:GetName(), function()
 		table.Empty(chatsounds.Flexes.Amplitudes)

@@ -2,6 +2,7 @@ local CS_ENABLE = GetConVar("chatsounds_enable")
 local CS_SH_MODE = GetConVar("chatsounds_sh_mode")
 local CS_RUNNER_INTERVAL = GetConVar("chatsounds_runner_interval")
 local CS_HIDE_TEXT = GetConVar("chatsounds_hide_text")
+local CS_MOUTH_FLEX = GetConVar("chatsounds_mouth_flexes")
 
 local COLOR_RED = Color(255, 0, 0)
 local function notify_error(err)
@@ -18,6 +19,7 @@ settings:AddCategory(category_name)
 
 settings:AddConvarSetting(category_name, "boolean", CS_ENABLE, "Enable chatsounds")
 settings:AddConvarSetting(category_name, "boolean", CS_HIDE_TEXT, "Hide big chatsounds messages")
+settings:AddConvarSetting(category_name, "boolean", CS_MOUTH_FLEX, "Move player models mouthes (EXPERIMENTAL)")
 
 settings:AddSpacer(category_name)
 
