@@ -6,7 +6,7 @@
 - [x] The last sound of a bunch of sounds does not parse properly
 - [x] Legacy modifiers assigned incorrectly, and arguments too, seems to have to do with waiting for a second char in the parser
 - [ ] Loop modifier does not work
-- [ ] Face flexes when saying sounds based on sound amplitude
+- [x] Face flexes when saying sounds based on sound amplitude
 - [x] nya#1%10 <- Stream cuts early, fix pitch down not changing duration
 - [x] :pitch(\[sin(t()*100)\]), the * in lua expressions is converted to :legacy_rep internally which breaks multiplications
 - [x] circular reference in json when recompiling all lists fully

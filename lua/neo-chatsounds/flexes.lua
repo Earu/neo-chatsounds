@@ -21,6 +21,7 @@ function flexes.PushStreamBuffer(ply, stream_id, buffer)
 	if not amplitudes[ply] then
 		amplitudes[ply] = {
 			TargetAmplitude = amplitude,
+			CurrentAmplitude = 0,
 		}
 	end
 
@@ -94,13 +95,31 @@ local moving_flexes = {
 	["right_mouth_drop"] = -1,
 	["left_mouth_drop"] = -1,
 }
+
+local model_flex_lookups = {}
+local function cache_flexes(ply)
+	local model_name = ply:GetModel()
+	if not model_flex_lookups[model_name] then
+		local flexes = {}
+		for flex_name in pairs(moving_flexes) do
+			local id = ply:GetFlexIDByName(flex_name)
+			if id then
+				flexes[flex_name] = id
+			end
+		end
+		model_flex_lookups[model_name] = flexes
+	end
+end
+
 local function process_flex(ply, target_amplitude)
 	if target_amplitude == 0 then return end
 
-	local flex_amplitude = (1 + target_amplitude) * (1 + target_amplitude)
+	cache_flexes(ply)
 
+	local model_name = ply:GetModel()
+	local flex_amplitude = (1 + target_amplitude) * (1 + target_amplitude)
 	for flex_name, value in pairs(moving_flexes) do
-		local id = ply:GetFlexIDByName(flex_name)
+		local id = model_flex_lookups[model_name][flex_name]
 		if id then
 			ply:SetFlexWeight(id, value ~= -1 and value or target_amplitude)
 		end
@@ -109,24 +128,18 @@ local function process_flex(ply, target_amplitude)
 	ply:SetFlexScale(flex_amplitude)
 end
 
-local next_update = 0
 hook.Add("Think", "chatsounds.Flexes", function()
 	if not chatsounds.Enabled then return end
-
-	local should_update = CurTime() >= next_update
-	if should_update then
-		next_update = CurTime() + 0.1
-	end
 
 	for ply, amplitude_data in pairs(amplitudes) do
 		if not IsValid(ply) then
 			amplitudes[ply] = nil
+			process_flex(ply, 0)
 			continue
 		end
 
-		if should_update then
-			amplitude_data.TargetAmplitude = compute_max_amplitude(ply)
-			process_flex(ply, amplitude_data.TargetAmplitude)
-		end
+		amplitude_data.TargetAmplitude = compute_max_amplitude(ply)
+		amplitude_data.CurrentAmplitude = math.Approach(amplitude_data.CurrentAmplitude, amplitude_data.TargetAmplitude, 0.01)
+		process_flex(ply, amplitude_data.CurrentAmplitude)
 	end
 end)
