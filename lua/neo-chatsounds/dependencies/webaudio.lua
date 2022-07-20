@@ -265,10 +265,10 @@ function webaudio.Initialize()
 			}
 
 			lua.message("stream_buffer", s);
-			setTimeout(on_audio_buffers_broadcast, 25);
+			setTimeout(on_audio_buffers_broadcast, 50);
 		}
 
-		setTimeout(on_audio_buffers_broadcast, 25);
+		setTimeout(on_audio_buffers_broadcast, 50);
 
 		function open() {
 			if (audio) {
