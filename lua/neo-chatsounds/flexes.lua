@@ -27,19 +27,17 @@ function flexes.PushStreamBuffer(ply, stream_id, buffer)
 	amplitudes[ply][stream_id] = amplitude
 end
 
-local function compute_average_amplitude(ply)
-	local sum = 0
-	local count = 0
+local function compute_max_amplitude(ply)
+	local max = 0
 	for key, amplitude in pairs(amplitudes[ply]) do
 		if key == "CurrentAmplitude" or key == "TargetAmplitude" then continue end
 
-		sum = sum + amplitude
-		count = count + 1
+		if amplitude > max then
+			max = amplitude
+		end
 	end
 
-	if sum == 0 then return 0 end
-
-	return sum / count
+	return max
 end
 
 function flexes.MarkForDeletion(ply, stream_id)
@@ -52,7 +50,7 @@ function flexes.MarkForDeletion(ply, stream_id)
 
 	amplitudes[ply][stream_id] = nil
 
-	if compute_average_amplitude(ply) == 0 then
+	if compute_max_amplitude(ply) == 0 then
 		amplitudes[ply] = nil
 	end
 end
@@ -89,20 +87,32 @@ end
 -- smile 0
 -- lower_lip 0
 
-local moving_flexes = { "jaw_drop", "smile", "lower_lip" }
+local moving_flexes = {
+	["right_funneler"] = 1.0,
+	["left_funneler"] = 1.0,
+	["jaw_drop"] = -1,
+	["right_mouth_drop"] = -1,
+	["left_mouth_drop"] = -1,
+}
 local function process_flex(ply, target_amplitude)
-	for _, flex_name in ipairs(moving_flexes) do
+	if target_amplitude == 0 then return end
+
+	local flex_amplitude = (1 + target_amplitude) * (1 + target_amplitude)
+
+	for flex_name, value in pairs(moving_flexes) do
 		local id = ply:GetFlexIDByName(flex_name)
 		if id then
-			ply:SetFlexWeight(id, target_amplitude)
+			ply:SetFlexWeight(id, value ~= -1 and value or target_amplitude)
 		end
 	end
 
-	ply:SetFlexScale(5)
+	ply:SetFlexScale(flex_amplitude)
 end
 
 local next_update = 0
 hook.Add("Think", "chatsounds.Flexes", function()
+	if not chatsounds.Enabled then return end
+
 	local should_update = CurTime() >= next_update
 	if should_update then
 		next_update = CurTime() + 0.1
@@ -115,20 +125,8 @@ hook.Add("Think", "chatsounds.Flexes", function()
 		end
 
 		if should_update then
-			amplitude_data.TargetAmplitude = compute_average_amplitude(ply)
-		end
-
-		local cur_amplitude = amplitude_data.CurrentAmplitude or 0
-		if cur_amplitude > amplitude_data.TargetAmplitude then
-			cur_amplitude = math.max(amplitude_data.TargetAmplitude, cur_amplitude - 0.1)
-		elseif cur_amplitude < amplitude_data.TargetAmplitude then
-			cur_amplitude = math.min(amplitude_data.TargetAmplitude, cur_amplitude + 0.1)
-		end
-
-		amplitude_data.CurrentAmplitude = cur_amplitude
-
-		if should_update then
-			process_flex(ply, cur_amplitude)
+			amplitude_data.TargetAmplitude = compute_max_amplitude(ply)
+			process_flex(ply, amplitude_data.TargetAmplitude)
 		end
 	end
 end)
