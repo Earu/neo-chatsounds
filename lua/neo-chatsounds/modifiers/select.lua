@@ -30,6 +30,7 @@ function MODIFIER.OnCompletion(text, suggestions, added_suggestions, is_upper_ca
 
 	local last_sound = sounds[#sounds]
 	local existing_sounds = chatsounds.Data.Lookup.List[last_sound.Key]
+	if #existing_sounds == 0 then return false end -- this should never happen but apparently does?
 
 	index = math.min(index, #existing_sounds)
 
