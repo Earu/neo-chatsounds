@@ -612,13 +612,14 @@ local function delete_folder_recursive(path)
 end
 
 concommand.Add("chatsounds_recompile_lists", function()
-	data.CompileLists()
 	delete_folder_recursive("chatsounds/cache")
+	data.CompileLists()
 end, nil, "Recompiles chatsounds lists lazily")
 
 concommand.Add("chatsounds_recompile_lists_full", function()
-	data.CompileLists(true)
 	delete_folder_recursive("chatsounds/cache")
+	delete_folder_recursive("chatsounds/repos")
+	data.CompileLists(true)
 end, nil, "Fully recompile all chatsounds lists")
 
 concommand.Add("chatsounds_clear_cache", function()
