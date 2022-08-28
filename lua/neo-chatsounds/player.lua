@@ -290,7 +290,9 @@ if CLIENT then
 
 			done = true
 			hook.Remove("Think", hook_name)
-			task:reject(("WebAudio Timeout %s\nIf this happens a lot please do chatsounds_reload!"):format(snd.Url))
+
+			chatsounds.Log(("WebAudio Timeout %s"):format(snd.Url))
+			task:resolve() -- resolve here instead of reject, because this seems to happen a lot? Webaudio issue most likely
 		end)
 
 		hook.Add("Think", hook_name, function()
