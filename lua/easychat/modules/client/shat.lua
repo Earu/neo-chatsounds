@@ -64,3 +64,5 @@ end)
 concommand.Add("shat_say", function()
 	say_rand_sound()
 end)
+
+return "Shat"

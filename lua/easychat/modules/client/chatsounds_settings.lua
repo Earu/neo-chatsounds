@@ -231,3 +231,5 @@ local setting_reload = settings:AddSetting(category_name, "action", "Reload chat
 setting_reload.DoClick = function()
 	RunConsoleCommand("chatsounds_reload")
 end
+
+return "Chatsounds Settings"
