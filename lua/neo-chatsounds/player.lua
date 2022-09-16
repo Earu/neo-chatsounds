@@ -53,7 +53,7 @@ if SERVER then
 		return false
 	end
 
-	local function handler(ply, text)
+	local function handler(ply, text, ...)
 		if #text >= STR_NETWORKING_LIMIT then
 			chatsounds.Error("Message too long: " .. #text .. "chars by " .. ply:Nick())
 			return
@@ -67,10 +67,22 @@ if SERVER then
 		local ret = hook.Run("ChatsoundsShouldNetwork", ply, text)
 		if ret == false then return end
 
+		local filter = RecipientFilter()
+		filter:AddPAS(ply:WorldSpaceCenter())
+
+		for _, listener in ipairs(player.GetAll()) do
+			local can_hear = hook.Run("ChatsoundsCanPlayerHear", ply, txt, listener, ...)
+			if can_hear == true then
+				filter:AddPlayer(listener)
+			elseif can_hear == false then
+				filter:RemovePlayer(listener)
+			end
+		end
+
 		net.Start("chatsounds")
 			net.WriteEntity(ply)
 			net.WriteString(text)
-		net.SendPAS(ply:WorldSpaceCenter())
+		net.Send(filter)
 	end
 
 	hook.Add("PlayerSay", "chatsounds.Player", handler)
