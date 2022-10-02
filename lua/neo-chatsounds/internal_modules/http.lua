@@ -1,6 +1,19 @@
 local _http = chatsounds.Module("Http")
 
-function _http.Get(url)
+local function encode_sound_path(path)
+	local path_chunks = path:Split("/")
+	path_chunks[#path_chunks] = path_chunks[#path_chunks]:gsub("%d", function(n)
+		return "%3" .. n
+	end)
+
+	return table.concat(path_chunks, "/")
+end
+
+function _http.Get(url, should_encode)
+	if should_encode then
+		url = encode_sound_path(url):gsub(" ", "%%20")
+	end
+
 	local t = chatsounds.Tasks.new()
 	local success = HTTP({
 		method = "GET",
