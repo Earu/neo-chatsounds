@@ -9,16 +9,16 @@ data.Lookup = data.Lookup or {
 }
 
 function data.CacheRepository(repo, branch, path)
-	if not file.Exists("chatsounds/repos", "DATA") then
-		file.CreateDir("chatsounds/repos")
+	if not file.Exists("chatsounds/repositories", "DATA") then
+		file.CreateDir("chatsounds/repositories")
 	end
 
 	local json = chatsounds.Json.encode(data.Repositories[("%s/%s/%s"):format(repo, branch, path)])
-	file.Write("chatsounds/repos/" .. util.SHA1(repo .. branch .. path) .. ".json", json)
+	file.Write("chatsounds/repositories/" .. util.SHA1(repo .. branch .. path) .. ".json", json)
 end
 
 function data.LoadCachedRepository(repo, branch, path)
-	local repo_cache_path = "chatsounds/repos/" .. util.SHA1(repo .. branch .. path) .. ".json"
+	local repo_cache_path = "chatsounds/repositories/" .. util.SHA1(repo .. branch .. path) .. ".json"
 
 	if not file.Exists(repo_cache_path, "DATA") then return end
 
@@ -64,7 +64,7 @@ end
 
 local function check_cache_validity(body, repo, path, branch)
 	local hash = util.SHA1(body)
-	local cache_path = ("chatsounds/repos/%s.json"):format(util.SHA1(repo .. branch .. path))
+	local cache_path = ("chatsounds/repositories/%s.json"):format(util.SHA1(repo .. branch .. path))
 	if file.Exists(cache_path, "DATA") then
 		chatsounds.Log(("Found cached repository for %s/%s/%s, validating content..."):format(repo, branch, path))
 
@@ -75,15 +75,6 @@ local function check_cache_validity(body, repo, path, branch)
 	end
 
 	return false, hash
-end
-
-local function encode_sound_path(path)
-	local path_chunks = path:Split("/")
-	path_chunks[#path_chunks] = path_chunks[#path_chunks]:gsub("%d", function(n)
-		return "%3" .. n
-	end)
-
-	return table.concat(path_chunks, "/")
 end
 
 function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
@@ -138,7 +129,7 @@ function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 						data.Repositories[repo_key].List[sound_key] = {}
 					end
 
-					local url = encode_sound_path(("https://raw.githubusercontent.com/%s/%s/%s/%s"):format(repo, branch, base_path, path)):gsub("%s", "%%20")
+					local url = ("https://raw.githubusercontent.com/%s/%s/%s/%s"):format(repo, branch, base_path, path)
 					local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
 					local sound_data = {
 						Url = url,
@@ -217,7 +208,7 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 							data.Repositories[repo_key].List[sound_key] = {}
 						end
 
-						local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, encode_sound_path(file_data.path)):gsub("%s", "%%20")
+						local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, file_data.path)
 						local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
 						local sound_data = {
 							Url = url,
@@ -618,7 +609,7 @@ end, nil, "Recompiles chatsounds lists lazily")
 
 concommand.Add("chatsounds_recompile_lists_full", function()
 	delete_folder_recursive("chatsounds/cache")
-	delete_folder_recursive("chatsounds/repos")
+	delete_folder_recursive("chatsounds/repositories")
 	data.CompileLists(true)
 end, nil, "Fully recompile all chatsounds lists")
 
