@@ -413,7 +413,7 @@ if CLIENT then
 
 				if not file.Exists(_sound.Path, "DATA") then
 					chatsounds.DebugLog(("Downloading %s"):format(_sound.Url))
-					chatsounds.Http.Get(_sound.Url):next(function(res)
+					chatsounds.Http.Get(_sound.Url, true):next(function(res)
 						if res.Status ~= 200 then
 							download_task:reject(("Failed to download %s: %d"):format(_sound.Url, res.Status))
 							return
