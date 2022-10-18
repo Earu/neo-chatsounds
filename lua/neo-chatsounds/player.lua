@@ -59,10 +59,7 @@ if SERVER then
 			return
 		end
 
-		if spam_watch(ply, text) then
-			chatsounds.Error("Message spammer: " .. ply:Nick())
-			return
-		end
+		if spam_watch(ply, text) then return end
 
 		local ret = hook.Run("ChatsoundsShouldNetwork", ply, text)
 		if ret == false then return end
