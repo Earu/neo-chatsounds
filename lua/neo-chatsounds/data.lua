@@ -453,17 +453,30 @@ if SERVER then
 		ply_to_network[ply] = true
 	end)
 
+	local function send_config(ply)
+		if not IsValid(ply) then return end
+
+		local success, started = pcall(function()
+			local started = net.Start("chatsounds_repos")
+			if not started then return false end
+
+			net.WriteString(data.RepoConfigJson)
+			net.Send(ply)
+
+			return started
+		end)
+
+		if not success or not started then
+			timer.Simple(5, function()
+				send_config(ply)
+			end)
+		end
+	end
+
 	hook.Add("SetupMove", "chatsounds.Data.RepoNetworking", function(ply, _, cmd)
 		if ply_to_network[ply] and not cmd:IsForced() then
 			-- wait a bit before networking the config to mitigate config not being received by clients
-			timer.Simple(2, function()
-				if not IsValid(ply) then return end
-
-				net.Start("chatsounds_repos")
-					net.WriteString(data.RepoConfigJson)
-				net.Send(ply)
-			end)
-
+			send_config(ply)
 			ply_to_network[ply] = nil
 		end
 	end)
