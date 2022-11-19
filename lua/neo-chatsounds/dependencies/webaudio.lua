@@ -6,6 +6,7 @@ webaudio.buffer_size = CreateClientConVar("webaudio_buffer_size", "2048", true)
 webaudio.debug = CreateClientConVar("webaudio_debug", "0")
 webaudio.volmod = CreateClientConVar("webaudio_volume", "1", true, false, "Sets the Volume from 0-1")
 webaudio.volume = 1
+webaudio.volume_ext_mul = 1
 
 local function logn(str)
 	MsgC(Color(0, 255, 0), "[webaudio] ")
@@ -77,7 +78,7 @@ do
 		if not system.HasFocus() and GetConVar("snd_mute_losefocus"):GetBool() then
 			webaudio.SetVolume(0)
 		else
-			webaudio.SetVolume(GetConVar("volume"):GetFloat() * webaudio.volmod:GetFloat())
+			webaudio.SetVolume(GetConVar("volume"):GetFloat() * webaudio.volmod:GetFloat() * webaudio.volume_ext_mul)
 		end
 
 		local time = RealTime()
@@ -1129,4 +1130,26 @@ function webaudio.StreamExists(streamId)
 	return webaudio.streams[streamId] ~= nil
 end
 
-return webaudio
+local multipliers = {}
+webaudio.volume_multipliers = multipliers
+
+--- Sets external volume multiplier from other addons that demand silence
+-- Arguments: m=multiplier from 0 to 1, id=external addon unique identifier
+-- NOTE: you need to implement fading yourself
+-- NOTE: lowest volume multiplier is set
+function webaudio.SetVolumeMultiplier(m, id)
+	id = id or true
+	m = tonumber(m)
+
+	if m == 1 then
+		m = nil
+	end
+
+	multipliers[id] = m
+	webaudio.volume_ext_mul = 1
+
+	for id, m in pairs(multipliers) do
+		webaudio.volume_ext_mul = math.min(webaudio.volume_ext_mul, math.Clamp(m or 1, 0, 1))
+	end
+end
+chatsounds.WebAudio = webaudio
