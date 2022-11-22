@@ -1152,4 +1152,4 @@ function webaudio.SetVolumeMultiplier(m, id)
 		webaudio.volume_ext_mul = math.min(webaudio.volume_ext_mul, math.Clamp(m or 1, 0, 1))
 	end
 end
-chatsounds.WebAudio = webaudio
+return webaudio
