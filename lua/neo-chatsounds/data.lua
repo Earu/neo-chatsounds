@@ -203,8 +203,14 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 					local realm = path_chunks[2]:lower()
 					local sound_key = path_chunks[3]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):Trim()
 
-					if #path_chunks > 4 then -- hopefully that shouldnt break stuff?
+					-- for files deep inside the folder structure we use the parent folder name as sound key
+					if #path_chunks > 4 then
 						sound_key = path_chunks[#path_chunks - 1]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):Trim()
+					end
+
+					-- priority operator to signal sound file name should be used instead of folder
+					if path_chunks[#path_chunks][1] == "!" then -- if sound file name starts with "!" prefer using sound file name
+						sound_key = path_chunks[#path_chunks]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):Trim():sub(2)
 					end
 
 					if #sound_key > 0 then
