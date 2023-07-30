@@ -203,6 +203,10 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 					local realm = path_chunks[2]:lower()
 					local sound_key = path_chunks[3]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):Trim()
 
+					if #path_chunks > 4 then -- hopefully that shouldnt break stuff?
+						sound_key = path_chunks[#path_chunks - 1]:lower():gsub("%.ogg$", ""):gsub("[%_%-]", " "):gsub("[%s\t\n\r]+", " "):Trim()
+					end
+
 					if #sound_key > 0 then
 						if not data.Repositories[repo_key].List[sound_key] then
 							data.Repositories[repo_key].List[sound_key] = {}
