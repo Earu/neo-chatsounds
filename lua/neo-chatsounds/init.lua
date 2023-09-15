@@ -62,18 +62,32 @@ function chatsounds.Reload()
 		chatsounds.MsgPack = include("neo-chatsounds/dependencies/msgpack.lua")
 	end
 
+
 	function chatsounds.Module(name)
-		if name=="Data" then
+		if name == "Data" then
+			-- HACK: Hiding Data module from lua_find_cl 
 			local module = chatsounds[name]
+
 			if not module then
-				local tbl={}
-				module = setmetatable({},{__index=tbl,__newindex=tbl,__tostring=function() return "<Chatsounds Data Module>" end})
+				local module_table = {}
+				chatsounds["Get" .. name] = function() return module_table end
+
+				module = setmetatable({}, {
+					__index = module_table,
+					__newindex = module_table,
+					module_table = module_table,
+					__tostring = function() return "<Chatsounds Module: " .. name .. ">" end
+				})
 			end
+
 			chatsounds[name] = module
+
 			return module
 		end
+
 		local module = chatsounds[name] or {}
 		chatsounds[name] = module
+
 		return module
 	end
 
