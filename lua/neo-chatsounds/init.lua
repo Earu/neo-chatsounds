@@ -63,6 +63,15 @@ function chatsounds.Reload()
 	end
 
 	function chatsounds.Module(name)
+		if name=="Data" then
+			local module = chatsounds[name]
+			if not module then
+				local tbl={}
+				module = setmetatable({},{__index=tbl,__newindex=tbl,__tostring=function() return "<Chatsounds Data Module>" end})
+			end
+			chatsounds[name] = module
+			return module
+		end
 		local module = chatsounds[name] or {}
 		chatsounds[name] = module
 		return module
