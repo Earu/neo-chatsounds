@@ -21,7 +21,7 @@ local function finish(deferred, state)
 		if state == RESOLVED then
 			f:resolve(deferred.value)
 		else
-			ErrorNoHalt(deferred.value)
+			--ErrorNoHalt(deferred.value)
 			f:reject(deferred.value)
 		end
 	end
