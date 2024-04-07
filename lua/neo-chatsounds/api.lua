@@ -68,6 +68,30 @@ function api.CreateScope()
 	}, { __index = SCOPE })
 end
 
+function api.SoundExists(sound_id)
+	return data.Lookup.List[sound_id] ~= nil
+end
+
+function api.GetAllSoundData()
+	return data.Lookup.List
+end
+
+function api.GetSoundData(sound_id)
+	return data.Lookup.List[sound_id]
+end
+
+function api.ModifierExists(modifier_id)
+	return chatsounds.Modifier[modifier_id] ~= nil
+end
+
+function api.GetAllModifiers()
+	return chatsounds.Modifiers
+end
+
+function api.GetModifier(modifier_id)
+	return chatsounds.Modifier[modifier_id]
+end
+
 if SERVER then
 	util.AddNetworkString("chatsounds.api")
 
