@@ -81,7 +81,7 @@ function api.GetSoundData(sound_id)
 end
 
 function api.ModifierExists(modifier_id)
-	return chatsounds.Modifier[modifier_id] ~= nil
+	return chatsounds.Modifiers[modifier_id] ~= nil
 end
 
 function api.GetAllModifiers()
@@ -89,7 +89,7 @@ function api.GetAllModifiers()
 end
 
 function api.GetModifier(modifier_id)
-	return chatsounds.Modifier[modifier_id]
+	return chatsounds.Modifiers[modifier_id]
 end
 
 if SERVER then
