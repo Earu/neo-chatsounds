@@ -2,8 +2,13 @@ SF.RegisterLibrary("chatsounds")
 local api = chatsounds.Module("API")
 
 local player_fns = { "PlayScope", "PlaySounds", "PlaySound" }
-SF.Permissions.registerPrivilege("chatsounds.playOnPlayers", "Chatsounds Play methods", "Allow the user to emit chatsounds from you", { server = { default = 3 }, client = { } })
-SF.Permissions.registerPrivilege("chatsounds.repos", "Chatsounds addRepo methods", "Allow the user to add new chatsounds repos", { client = { default = 3 } })
+if SERVER then
+	SF.Permissions.registerPrivilege("chatsounds.playOnPlayers", "Chatsounds Play methods", "Allow the user to emit chatsounds from you", { server = { default = 3 }})
+end
+
+if CLIENT then
+	SF.Permissions.registerPrivilege("chatsounds.repos", "Chatsounds addRepo methods", "Allow the user to add new chatsounds repos", { client = { default = 3 } })
+end
 
 local function module(instance)
 	local unwrap = instance.Types.Player.Unwrap
