@@ -8,12 +8,12 @@ function MODIFIER:ParseArgs(args)
 	local pitch = tonumber(args)
 	if not pitch then return self.DefaultValue end
 
-	return math.min(math.max(-5, pitch), 5)
+	return math.min(math.max(-50, pitch), 50)
 end
 
 function MODIFIER:LegacyParseArgs(args)
 	local pitch = tonumber(args) or 100
-	return math.min(math.max(-5, pitch / 100), 5)
+	return math.min(math.max(-50, pitch / 100), 50)
 end
 
 function MODIFIER:GetValue()
@@ -22,7 +22,7 @@ function MODIFIER:GetValue()
 		local _, ret = pcall(self.ExpressionFn)
 		if not isnumber(ret) then return self.DefaultValue end
 
-		return math.min(math.max(-5, ret), 5)
+		return math.min(math.max(-50, ret), 50)
 	end
 
 	return self.Value
