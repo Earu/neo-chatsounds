@@ -177,6 +177,52 @@ if CLIENT then
 	function api.PlaySound(sound_id, modifiers)
 		api.PlaySounds({ sound_id }, modifiers)
 	end
+
+	local adding_repo = false
+	function api.AddRepo(repo, branch, base_path, on_success, on_error)
+		if adding_repo then
+			error("Already adding a repo")
+		end
+
+		adding_repo = true
+		data.BuildFromGithub(repo, branch, base_path, true):next(function()
+			data.CompileLists():next(function()
+				adding_repo = false
+				on_success()
+			end, function(err)
+				adding_repo = false
+				on_error(err)
+			end)
+		end, function(err)
+			adding_repo = false
+			on_error(err)
+		end)
+	end
+
+	function api.AddRepos(repos, on_success, on_error)
+		if adding_repo then
+			error("Already adding a repo")
+		end
+
+		adding_repo = true
+		local tasks = {}
+		for _, repo_data in ipairs(repos) do
+			table.insert(tasks, data.BuildFromGithub(repo_data.Repo, repo_data.Branch, repo_data.BasePath, true))
+		end
+
+		chatsounds.Tasks.all(tasks):next(function()
+			data.CompileLists():next(function()
+				adding_repo = false
+				on_success()
+			end, function(err)
+				adding_repo = false
+				on_error(err)
+			end)
+		end, function(err)
+			adding_repo = false
+			on_error(err)
+		end)
+	end
 end
 
 -- EXAMPLES

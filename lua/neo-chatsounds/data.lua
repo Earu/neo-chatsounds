@@ -150,6 +150,7 @@ function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 	return t
 end
 
+--chatsounds.Data.BuildFromGithub("blockmanbuster/neptune-chatsounds", "main", "sound/chatsounds", true)
 function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 	branch = branch or "master"
 
@@ -548,7 +549,7 @@ function data.CompileLists(force_recompile)
 	]]--
 
 	local repo_processing = false
-	local function process_repos(rebuild_dynamic_lookup)
+	local function process_repos(rebuild_dynamic_lookup, parent_task)
 		if repo_processing then return end
 
 		repo_processing = true
@@ -560,13 +561,16 @@ function data.CompileLists(force_recompile)
 			data.Loading = nil
 			chatsounds.Log("Done compiling all lists")
 			hook.Run("ChatsoundsInitialized")
+			parent_task:resolve()
 		end, function(err)
 			data.Loading = nil
 			chatsounds.Error(err)
 			hook.Run("ChatsoundsInitialized")
+			parent_task:reject(err)
 		end)
 	end
 
+	local t = chatsounds.Tasks.new()
 	local time_in_secs = 0
 	timer.Create("chatsounds_repos", 1, 0, function()
 		if not data.Loading then
@@ -576,7 +580,7 @@ function data.CompileLists(force_recompile)
 
 		time_in_secs = time_in_secs + 1
 		if time_in_secs >= 60 * 5 then
-			process_repos(false)
+			process_repos(false, t)
 			timer.Remove("chatsounds_repos")
 		end
 	end)
@@ -592,14 +596,16 @@ function data.CompileLists(force_recompile)
 			end
 		end
 
-		process_repos(rebuild_dynamic_lookup)
+		process_repos(rebuild_dynamic_lookup, t)
 	end, function(errors)
 		for _, err in ipairs(errors) do
 			chatsounds.Error(err)
 		end
 
-		process_repos(false)
+		process_repos(false, t)
 	end)
+
+	return t
 end
 
 if not concommand.GetTable().chatsounds_recompile_lists then
