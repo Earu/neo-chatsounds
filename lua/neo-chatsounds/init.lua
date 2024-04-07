@@ -93,6 +93,7 @@ function chatsounds.Reload()
 		AddCSLuaFile("neo-chatsounds/player.lua")
 		AddCSLuaFile("neo-chatsounds/blacklist.lua")
 		AddCSLuaFile("neo-chatsounds/flexes.lua")
+		AddCSLuaFile("neo-chatsounds/api.lua")
 
 		include("neo-chatsounds/data.lua")
 		include("neo-chatsounds/completion.lua")
@@ -100,6 +101,7 @@ function chatsounds.Reload()
 		include("neo-chatsounds/player.lua")
 		include("neo-chatsounds/blacklist.lua")
 		include("neo-chatsounds/flexes.lua")
+		include("neo-chatsounds/api.lua")
 	end
 end
 
