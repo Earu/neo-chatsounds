@@ -22,6 +22,9 @@ if SERVER then
 	local function spam_watch(ply, msg)
 		if ply:IsAdmin() then return false end
 
+		local should_ignore = hook.Run("ChatsoundsShouldIgnoreSpam", ply, msg)
+		if should_ignore == true then return false end
+
 		local time = RealTime()
 		local last_msg = spam_watch_lookup[ply] or { Time = 0, Message = "" }
 
