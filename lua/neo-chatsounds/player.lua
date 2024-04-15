@@ -79,7 +79,7 @@ if SERVER then
 			end
 		end
 
-		net.Start("chatsounds")
+		net.Start("chatsounds", true)
 			net.WriteEntity(ply)
 			net.WriteString(text)
 		net.Send(filter)
@@ -576,7 +576,7 @@ if CLIENT then
 		if chatsounds.Data.Loading then return end
 		if ply ~= LocalPlayer() then return end
 
-		net.Start("chatsounds_cmd")
+		net.Start("chatsounds_cmd", true)
 			net.WriteString(text:sub(1, STR_NETWORKING_LIMIT))
 		net.SendToServer()
 	end
