@@ -101,7 +101,7 @@ if SERVER then
 		end
 
 		local str = scope:ToString()
-		net.Start("chatsounds.api")
+		net.Start("chatsounds.api", true)
 			net.WriteEntity(ply)
 			net.WriteString(str)
 
@@ -154,7 +154,7 @@ if CLIENT then
 
 	function api.PlayScope(scope)
 		local str = scope:ToString()
-		net.Start("chatsounds_cmd")
+		net.Start("chatsounds_cmd", true)
 			net.WriteString(str:sub(1, STR_NETWORKING_LIMIT))
 		net.SendToServer()
 	end
