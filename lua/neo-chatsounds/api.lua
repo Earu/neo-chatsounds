@@ -179,15 +179,32 @@ if CLIENT then
 	end
 
 	local adding_repo = false
-	function api.AddRepo(repo, branch, base_path, on_success, on_error)
+	local added_repos = {}
+	function api.GetAddedRepositories()
+		return table.GetKeys(added_repos)
+	end
+
+	function api.IsAddedRepository(repo, branch, base_path)
+		local repo_key = table.concat({ repo, branch, base_path }, "/")
+		return added_repos[repo_key] ~= nil
+	end
+
+	function api.AddRepository(repo, branch, base_path, on_success, on_error)
 		if adding_repo then
 			error("Already adding a repo")
+		end
+
+		local repo_key = table.concat({ repo, branch, base_path }, "/")
+		if added_repos[repo_key] then
+			on_success()
+			return
 		end
 
 		adding_repo = true
 		data.BuildFromGithub(repo, branch, base_path, true):next(function()
 			data.CompileLists():next(function()
 				adding_repo = false
+				added_repos[repo_key] = true
 				on_success()
 			end, function(err)
 				adding_repo = false
@@ -199,7 +216,7 @@ if CLIENT then
 		end)
 	end
 
-	function api.AddRepos(repos, on_success, on_error)
+	function api.AddRepositories(repos, on_success, on_error)
 		if adding_repo then
 			error("Already adding a repo")
 		end
@@ -207,12 +224,27 @@ if CLIENT then
 		adding_repo = true
 		local tasks = {}
 		for _, repo_data in ipairs(repos) do
-			table.insert(tasks, data.BuildFromGithub(repo_data.Repo, repo_data.Branch, repo_data.BasePath, true))
+			local repo_key = table.concat({ repo_data.Repo, repo_data.Branch, repo_data.BasePath }, "/")
+			if not added_repos[repo_key] then
+				table.insert(tasks, data.BuildFromGithub(repo_data.Repo, repo_data.Branch, repo_data.BasePath, true))
+			end
+		end
+
+		-- everything was cached
+		if #repos < 1 then
+			on_success()
+			return
 		end
 
 		chatsounds.Tasks.all(tasks):next(function()
 			data.CompileLists():next(function()
 				adding_repo = false
+
+				for _, repo_data in ipairs(repos) do
+					local repo_key = table.concat({ repo_data.Repo, repo_data.Branch, repo_data.BasePath }, "/")
+					added_repos[repo_key] = true
+				end
+
 				on_success()
 			end, function(err)
 				adding_repo = false
