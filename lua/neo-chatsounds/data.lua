@@ -8,6 +8,13 @@ data.Lookup = data.Lookup or {
 	Dynamic = {},
 }
 
+local function BUILD_CONTENT_URL(repo, branch, path)
+	-- without jsdeliver
+	-- return ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, path)
+
+	return ("https://cdn.jsdelivr.net/gh/%s@%s/%s"):format(repo, branch, path)
+end
+
 function data.CacheRepository(repo, branch, path)
 	if not file.Exists("chatsounds/repositories", "DATA") then
 		file.CreateDir("chatsounds/repositories")
@@ -80,7 +87,7 @@ end
 function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 	branch = branch or "master"
 
-	local msg_pack_url = ("https://raw.githubusercontent.com/%s/%s/%s/list.msgpack"):format(repo, branch, base_path)
+	local msg_pack_url = BUILD_CONTENT_URL(repo, branch, ("%s/list.msgpack"):format(base_path))
 	local t = chatsounds.Tasks.new()
 	chatsounds.Http.Get(msg_pack_url):next(function(res)
 		local rate_limited = handle_rate_limit(res, t, data.BuildFromGitHubMsgPack, repo, branch, base_path, force_recompile)
@@ -129,7 +136,7 @@ function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 						data.Repositories[repo_key].List[sound_key] = {}
 					end
 
-					local url = ("https://raw.githubusercontent.com/%s/%s/%s/%s"):format(repo, branch, base_path, path)
+					local url = BUILD_CONTENT_URL(repo, branch, ("%s/%s"):format(base_path, path))
 					local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
 					local sound_data = {
 						Url = url,
@@ -219,7 +226,7 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 							data.Repositories[repo_key].List[sound_key] = {}
 						end
 
-						local url = ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, file_data.path)
+						local url = BUILD_CONTENT_URL(repo, branch, file_data.path)
 						local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
 						local sound_data = {
 							Url = url,
