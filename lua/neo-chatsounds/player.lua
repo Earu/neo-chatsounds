@@ -479,6 +479,8 @@ if CLIENT then
 								if not success then
 									chatsounds.Error("Failed to finish stream " .. hook_name .. ":" .. err)
 								end
+
+								hook.Run("ChatsoundsSoundFinish", ply, _sound, sound_data)
 							end
 
 							for _, modifier in ipairs(sound_data.Modifiers) do
