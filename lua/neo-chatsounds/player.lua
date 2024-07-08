@@ -457,6 +457,7 @@ if CLIENT then
 						if not IsValid(ply) or not stream:IsValid() then
 							if not started then
 								sound_task:resolve()
+								hook.Run("ChatsoundsSoundFinish", ply, _sound, sound_data)
 							end
 
 							hook.Remove("Think", hook_name)
@@ -479,8 +480,6 @@ if CLIENT then
 								if not success then
 									chatsounds.Error("Failed to finish stream " .. hook_name .. ":" .. err)
 								end
-
-								hook.Run("ChatsoundsSoundFinish", ply, _sound, sound_data)
 							end
 
 							for _, modifier in ipairs(sound_data.Modifiers) do
@@ -495,6 +494,7 @@ if CLIENT then
 								end
 
 								sound_task:resolve()
+								hook.Run("ChatsoundsSoundFinish", ply, _sound, sound_data)
 							end)
 
 							if stream.Overlap then
