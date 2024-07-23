@@ -18,13 +18,12 @@ local function say_rand_sound()
 end
 
 local function pick_realm(realms)
-	if not realms or #realms:Trim() == 0 then
+	if #realms == 0 then
 		realm_sounds = {}
 		chatsounds.Log("Shat realm was reset")
 		return
 	end
 
-	realms = realms:Split(",")
 	for i = 1, #realms do
 		realms[realms[i]] = i
 	end
@@ -37,7 +36,6 @@ local function pick_realm(realms)
 			end
 		end
 	end
-
 
 	chatsounds.Log(("Shat switched to realm(s): %s\nFound %d sounds"):format(table.concat(realms, ", "), #realm_sounds))
 end
@@ -55,27 +53,27 @@ end
 refresh_realms()
 hook.Add("ChatsoundsInitialized", "shatrealms", refresh_realms)
 
-concommand.Add("shat", function(_, _, _, str_args)
-	str_args = str_args:Trim()
-	pick_realm(str_args)
+concommand.Add("shat", function(_, _, args)
+	pick_realm(args)
 end, function(_, str_args)
 	local suggestions = {}
-	local args = str_args:gsub(" ",""):gsub(",,",","):Trim():Split(",")
+	local args = str_args:Trim():Split(" ")
 	for i = 1, math.max(#args - 1, 1) do
 		args[args[i]] = i
 	end
 	local endres = table.Copy(args)
+	if str_args[#str_args] == " " and not args[""] then args[""] = table.insert(args, "") end
 	if #args > 0 or #str_args:Trim() == 0 then
 		for realm, _ in pairs(existing_realms) do
 			if realm:match(args[#args]) and not (#args > 1 and args[realm]) then
 				endres[#args] = realm
-				table.insert(suggestions, string.format("shat %s", table.concat(endres, ","))) -- "shat " .. realm)
+				table.insert(suggestions, string.format("shat %s", table.concat(endres, " "))) -- "shat " .. realm)
 			end
 		end
 	end
 
 	return suggestions
-end, "Pick realms to shat_say from, separate with comma")
+end, "Pick realms to shat_say from")
 
 concommand.Add("shat_say", function()
 	say_rand_sound()
