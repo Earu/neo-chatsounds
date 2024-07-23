@@ -1,5 +1,5 @@
 -- this is a EC module because SayLocal is not vanilla, and is implemented in EC,
--- alos EC has a spam protection which will mitigate the spam this can generate
+-- also EC has a spam protection which will mitigate the spam this can generate
 
 local realm_sounds = {}
 local function say_rand_sound()
@@ -17,49 +17,63 @@ local function say_rand_sound()
 	end
 end
 
-local function pick_realm(realm)
-	if not realm or #realm:Trim() == 0 then
+local function pick_realm(realms)
+	if #realms == 0 then
 		realm_sounds = {}
 		chatsounds.Log("Shat realm was reset")
 		return
 	end
 
+	for i = 1, #realms do
+		realms[realms[i]] = i
+	end
+
 	realm_sounds = {}
 	for sound_key, sounds in pairs(chatsounds.Data.Lookup.List) do
 		for index, sound_data in ipairs(sounds) do
-			if sound_data.Realm == realm then
+			if realms[sound_data.Realm] then
 				table.insert(realm_sounds, #sounds == 1 and sound_key or { Key = sound_key, Index = index })
 			end
 		end
 	end
 
-
-	chatsounds.Log(("Shat switched to realm: %s\nFound %d sounds"):format(realm, #realm_sounds))
+	chatsounds.Log(("Shat switched to realm(s): %s\nFound %d sounds"):format(table.concat(realms, ", "), #realm_sounds))
 end
 
-local existing_realms = {}
-for sound_key, sounds in pairs(chatsounds.Data.Lookup.List) do
-	for index, sound_data in ipairs(sounds) do
-		existing_realms[sound_data.Realm] = true
+local existing_realms
+local function refresh_realms()
+	existing_realms = {}
+	for sound_key, sounds in pairs(chatsounds.Data.Lookup.List) do
+		for index, sound_data in ipairs(sounds) do
+			existing_realms[sound_data.Realm] = true
+		end
 	end
 end
 
-concommand.Add("shat", function(_, _, _, str_args)
-	str_args = str_args:Trim()
-	pick_realm(str_args)
+refresh_realms()
+hook.Add("ChatsoundsInitialized", "shatrealms", refresh_realms)
+
+concommand.Add("shat", function(_, _, args)
+	pick_realm(args)
 end, function(_, str_args)
 	local suggestions = {}
 	local args = str_args:Trim():Split(" ")
-	if #args == 1 or #str_args:Trim() == 0 then
+	for i = 1, math.max(#args - 1, 1) do
+		args[args[i]] = i
+	end
+	local endres = table.Copy(args)
+	if str_args[#str_args] == " " and not args[""] then args[""] = table.insert(args, "") end
+	if #args > 0 or #str_args:Trim() == 0 then
 		for realm, _ in pairs(existing_realms) do
-			if realm:match(args[1]) then
-				table.insert(suggestions, "shat " .. realm)
+			if realm:match(args[#args]) and not (#args > 1 and args[realm]) then
+				endres[#args] = realm
+				table.insert(suggestions, string.format("shat %s", table.concat(endres, " "))) -- "shat " .. realm)
 			end
 		end
 	end
 
 	return suggestions
-end)
+end, "Pick realms to shat_say from")
 
 concommand.Add("shat_say", function()
 	say_rand_sound()
