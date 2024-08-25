@@ -1,6 +1,5 @@
 local api = chatsounds.Module("API")
 local data = chatsounds.Module("Data")
-local cs_player = chatsounds.Module("Player")
 
 local SCOPE = {}
 
@@ -93,15 +92,13 @@ function api.GetModifier(modifier_id)
 end
 
 if SERVER then
-	util.AddNetworkString("chatsounds.api")
-
 	function api.PlayScope(ply, scope, recipient_filter)
 		if not IsValid(ply) then
 			error("Provided player was invalid")
 		end
 
 		local str = scope:ToString()
-		net.Start("chatsounds.api", true)
+		net.Start("chatsounds", true)
 			net.WriteEntity(ply)
 			net.WriteString(str)
 
@@ -135,23 +132,6 @@ end
 
 if CLIENT then
 	local STR_NETWORKING_LIMIT = 60000
-
-	net.Receive("chatsounds.api", function()
-		if not chatsounds.Enabled then return end
-		if data.Loading then return end
-
-		local ply = net.ReadEntity()
-		local str = net.ReadString()
-
-		if not IsValid(ply) then return end
-
-		cs_player.PlayAsync(ply, str):next(nil, function(errors)
-			for _, err in ipairs(errors) do
-				chatsounds.Error(err)
-			end
-		end)
-	end)
-
 	function api.PlayScope(scope)
 		local str = scope:ToString()
 		net.Start("chatsounds_cmd", true)
