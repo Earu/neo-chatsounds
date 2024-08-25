@@ -56,7 +56,7 @@ if SERVER then
 		return false
 	end
 
-	local function handler(ply, text, ...)
+	local function handler(ply, text, src)
 		if #text >= STR_NETWORKING_LIMIT then
 			chatsounds.Error("Message too long: " .. #text .. "chars by " .. ply:Nick())
 			return
@@ -82,14 +82,17 @@ if SERVER then
 		net.Start("chatsounds", true)
 			net.WriteEntity(ply)
 			net.WriteString(text)
+			net.WriteString(src)
 		net.Send(filter)
 	end
 
-	hook.Add("PlayerSay", "chatsounds.Player", handler)
+	hook.Add("PlayerSay", "chatsounds.Player", function(ply, text)
+		handler(ply, text, "CHAT")
+	end)
 
 	net.Receive("chatsounds_cmd", function(_, ply)
 		local text = net.ReadString()
-		handler(ply, text)
+		handler(ply, text, "COMMAND")
 	end)
 end
 
@@ -607,9 +610,12 @@ if CLIENT then
 		if chatsounds.Data.Loading then return end
 
 		local ply = net.ReadEntity()
-		local text = net.ReadString()
-
 		if not IsValid(ply) then return end
+
+		local text = net.ReadString()
+		local src = net.ReadString()
+
+		hook.Run("ChatsoundsPreProcessing", ply, text, src)
 
 		cs_player.PlayAsync(ply, text):next(nil, function(errors)
 			for _, err in ipairs(errors) do
