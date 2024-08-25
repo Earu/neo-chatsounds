@@ -56,7 +56,7 @@ if SERVER then
 		return false
 	end
 
-	local function handler(ply, text, src)
+	local function handler(ply, text, src, ...)
 		if #text >= STR_NETWORKING_LIMIT then
 			chatsounds.Error("Message too long: " .. #text .. "chars by " .. ply:Nick())
 			return
@@ -86,8 +86,8 @@ if SERVER then
 		net.Send(filter)
 	end
 
-	hook.Add("PlayerSay", "chatsounds.Player", function(ply, text)
-		handler(ply, text, "CHAT")
+	hook.Add("PlayerSay", "chatsounds.Player", function(ply, text, ...)
+		handler(ply, text, "CHAT", ...)
 	end)
 
 	net.Receive("chatsounds_cmd", function(_, ply)
