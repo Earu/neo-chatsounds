@@ -8,12 +8,14 @@ data.Lookup = data.Lookup or {
 	Dynamic = {},
 }
 
-local function BUILD_CONTENT_URL(repo, branch, path)
-	-- just github
-	return ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, path)
+local CDN_USE_FALLBACK = CreateConVar("chatsounds_cdn_use_fallback", "0", FCVAR_ARCHIVE, "Use fallback CDN for chatsounds, this is useful if getting from github directly is not working (requires a reload!)", 0, 1)
 
-	-- jsdeliver
-	--return ("https://cdn.jsdelivr.net/gh/%s@%s/%s"):format(repo, branch, path)
+local function BUILD_CONTENT_URL(repo, branch, path)
+	if CDN_USE_FALLBACK:GetBool() then
+		return ("https://cdn.statically.io/gh/%s/%s/%s"):format(repo, branch, path)
+	else
+		return ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, path)
+	end
 end
 
 function data.CacheRepository(repo, branch, path)
