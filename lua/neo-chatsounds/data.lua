@@ -9,11 +9,7 @@ data.Lookup = data.Lookup or {
 }
 
 local function BUILD_CONTENT_URL(repo, branch, path)
-	-- just github
-	return ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, path)
-
-	-- jsdeliver
-	--return ("https://cdn.jsdelivr.net/gh/%s@%s/%s"):format(repo, branch, path)
+	return ("https://cdn.statically.io/gh/%s/%s/%s"):format(repo, branch, path)
 end
 
 function data.CacheRepository(repo, branch, path)
