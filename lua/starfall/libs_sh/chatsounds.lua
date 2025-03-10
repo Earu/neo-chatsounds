@@ -1,7 +1,12 @@
 SF.RegisterLibrary("chatsounds")
 local api = chatsounds.Module("API")
+local checkluatype = SF.CheckLuaType
 
-local player_fns = { "PlayScope", "PlaySounds", "PlaySound" }
+local player_fns = {
+	PlayScope = true,
+	PlaySounds = true,
+	PlaySound = true
+}
 if SERVER then
 	SF.Permissions.registerPrivilege("chatsounds.playOnPlayers", "Chatsounds Play methods", "Allow the user to emit chatsounds from you", { server = { default = 3 }})
 end
@@ -18,11 +23,27 @@ local function module(instance)
 	for key, fn in pairs(api) do
 		local new_fn = fn
 		if SERVER and player_fns[key] then
-			new_fn = function(ply, ...)
-				ply = unwrap(ply)
-				checkPermission(instance, ply, "chatsounds.playOnPlayers")
+			if key == "PlayScope" then
+				new_fn = function(ply, scope, recipient_filter)
+					ply = unwrap(ply)
+					checkPermission(instance, ply, "chatsounds.playOnPlayers")
 
-				return fn(ply, ...)
+					if recipient_filter then
+						checkluatype(recipient_filter, TYPE_TABLE)
+						for i, pl in ipairs(recipient_filter) do
+							recipient_filter[i] = unwrap(pl)
+						end
+					end
+
+					return fn(ply, scope, recipient_filter)
+				end
+			else
+				new_fn = function(ply, ...)
+					ply = unwrap(ply)
+					checkPermission(instance, ply, "chatsounds.playOnPlayers")
+
+					return fn(ply, ...)
+				end
 			end
 		end
 
