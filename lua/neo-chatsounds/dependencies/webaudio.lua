@@ -1036,8 +1036,10 @@ do
 
 	function META:Think()
 		if self.Paused then return end
-
-		self:UpdateVolume()
+		
+		if webaudio.eye_velocity then
+			self:UpdateVolume()
+		end
 	end
 
 	function META:__newindex(key, val)
