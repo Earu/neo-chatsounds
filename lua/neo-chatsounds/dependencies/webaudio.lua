@@ -111,6 +111,10 @@ function webaudio.Shutdown()
 	hook.Remove("Think", "webaudio2")
 end
 
+function webaudio.HasInitialized()
+	return webaudio.browser_state == "initialized"
+end
+
 function webaudio.Initialize()
 	if webaudio.browser_state ~= "uninitialized" then return end
 
@@ -932,10 +936,12 @@ do
 
 	function META:UpdateVolume()
 		queue_javascript()
-		if self:Get3D() then
-			self:UpdateVolume3d()
-		else
-			self:UpdateVolumeFlat()
+		if webaudio.HasInitialized() then
+			if self:Get3D() then
+				self:UpdateVolume3d()
+			else
+				self:UpdateVolumeFlat()
+			end
 		end
 		execute_javascript()
 	end
