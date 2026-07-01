@@ -549,6 +549,7 @@ if CLIENT then
 			t:resolve()
 			return t
 		end
+		
 
 		local tasks = {}
 		local text_chunks = text:Split(CONTEXT_SEPARATOR)
@@ -557,6 +558,11 @@ if CLIENT then
 			chatsounds.Parser.ParseAsync(chunk):next(function(sound_group)
 				local ret = hook.Run("ChatsoundsShouldPlay", ply, chunk, sound_group)
 				if ret == false then
+					t:resolve()
+					return
+				end
+				if not chatsounds.WebAudio.HasInitialized() then
+					-- no point in queueing if the webaudio cannot load
 					t:resolve()
 					return
 				end
