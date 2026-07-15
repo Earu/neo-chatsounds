@@ -252,14 +252,75 @@ end
 -- Dynamically expanding table, this took me a while to figure out so I'll try to explain it.
 -- Because the lookup for the sound key of chatsounds is that large, its not appropriate to iterate over it for suggestions.
 -- The time complexity would be O(n) and essentially the game would freeze for 5/10 seconds each time you type a character.
--- The idea here is to subdivide the sound keys into recursive chunks of 1000 sounds MAX each.
--- They can be then indexed by the depth marked at first level of the table e.g (lookup.Dynamic['g'].__depth or 1).
--- Depending on the depth we may have something like: lookup.Dynamic = { ['g'] = { __depth = 2, ['a'] = { "im looking at gay porno", "gay porno", "gay" } } }
--- By diving sound keys into chunks we ensure that the time complexity needed to build a suggestion list is minimal because accessing a table with a hash key is O(1),
--- that brings the total time complexity to somewhere around O(d + n) where d is the depth and n the amount of sound keys at that depth.
+-- The idea here is to subdivide the sound keys into a trie: each word of a sound key is indexed character by character,
+-- so lookup.Dynamic['g'] holds sounds that have a word starting with 'g', and once that node holds too many sounds they
+-- get pushed down into lookup.Dynamic['g'].Keys['a'] (words starting with "ga") and so on.
+-- Words that ARE the node prefix (e.g the word "a" in the node for 'a') cannot go deeper and stay in that node.
+-- Accessing a table with a hash key being O(1), building a suggestion list only costs the descent (bounded by the length
+-- of the typed word) plus the amount of sounds stored in the reached subtree.
 -- Building this kind of lookup however is very expensive, which is why it should only be done ONCE, and then CACHED if possible.
-local MAX_DYN_CHUNK_CHUNK_SIZE = 2e999 --1000
--- TODO: fix completion breaking when deeper nodes
+local MAX_DYN_CHUNK_SIZE = 1000
+
+local function add_sound_to_node(node, sound_key, existing_node_sounds)
+	local node_sounds = existing_node_sounds[node]
+	if not node_sounds then
+		node_sounds = {}
+		existing_node_sounds[node] = node_sounds
+	end
+
+	if not node_sounds[sound_key] then
+		node_sounds[sound_key] = true
+		table.insert(node.Sounds, sound_key)
+	end
+end
+
+-- pushes the sounds of an oversized node down into child nodes keyed by the character of each
+-- matching word that follows the node prefix, sounds whose matching words cannot go deeper stay
+local function split_dynamic_node(node, depth, prefix, existing_node_sounds)
+	local remaining = {}
+	local remaining_set = {}
+	local moved_count = 0
+
+	for _, chunked_sound_key in ipairs(node.Sounds) do
+		chatsounds.Runners.Yield()
+
+		local kept = false
+		local moved = false
+		for _, word in ipairs(chunked_sound_key:Split(" ")) do
+			if word:sub(1, depth) == prefix then
+				if #word > depth then
+					local char = word[depth + 1]
+					if not node.Keys[char] then
+						node.Keys[char] = {
+							Sounds = {},
+							Keys = {},
+						}
+					end
+
+					add_sound_to_node(node.Keys[char], chunked_sound_key, existing_node_sounds)
+					moved = true
+				else
+					kept = true
+				end
+			end
+		end
+
+		if (kept or not moved) and not remaining_set[chunked_sound_key] then
+			remaining_set[chunked_sound_key] = true
+			table.insert(remaining, chunked_sound_key)
+		end
+
+		if moved then
+			moved_count = moved_count + 1
+		end
+	end
+
+	node.Sounds = remaining
+	existing_node_sounds[node] = remaining_set
+
+	return moved_count
+end
+
 local function build_dynamic_lookup(dyn_lookup, sound_key, existing_node_sounds)
 	local words = sound_key:Split(" ")
 
@@ -279,68 +340,37 @@ local function build_dynamic_lookup(dyn_lookup, sound_key, existing_node_sounds)
 		end
 
 		local root_node = dyn_lookup[first_char]
-		local cur_node = dyn_lookup[first_char]
-		if root_node.__depth then
-			for i = 2, #word_key do
-				local char = word_key[i]
-				if not cur_node.Keys[char] then break end
+		local cur_node = root_node
+		local depth = 1
+		while depth < #word_key do
+			local next_node = cur_node.Keys[word_key[depth + 1]]
+			if not next_node then break end
 
-				cur_node = cur_node.Keys[char]
+			cur_node = next_node
+			depth = depth + 1
+		end
+
+		add_sound_to_node(cur_node, sound_key, existing_node_sounds)
+
+		-- NextSplit amortizes re-splitting nodes full of sounds that cannot go deeper
+		-- (e.g thousands of sound keys containing the standalone word "a")
+		if #cur_node.Sounds >= MAX_DYN_CHUNK_SIZE and #cur_node.Sounds >= (cur_node.NextSplit or 0) then
+			local moved_count = split_dynamic_node(cur_node, depth, word_key:sub(1, depth), existing_node_sounds)
+			cur_node.NextSplit = #cur_node.Sounds + MAX_DYN_CHUNK_SIZE
+
+			if moved_count > 0 then
+				root_node.__depth = math.max(root_node.__depth or 1, depth + 1)
 			end
-		end
-
-		if not existing_node_sounds[cur_node] then
-			existing_node_sounds[cur_node] = {}
-		end
-
-		if not existing_node_sounds[cur_node][sound_key] then
-			existing_node_sounds[cur_node][sound_key] = true
-			table.insert(cur_node.Sounds, sound_key)
-		end
-
-		if #cur_node.Sounds >= MAX_DYN_CHUNK_CHUNK_SIZE then
-			local depth = root_node.__depth or 1
-			for sound_key_index, chunked_sound_key in ipairs(cur_node.Sounds) do
-				local target_node = cur_node
-				for i = depth, #chunked_sound_key do
-					chatsounds.Runners.Yield()
-
-					local char = chunked_sound_key[i]
-					if not char then break end
-
-					if not cur_node.Keys[char] then
-						cur_node.Keys[char] = {
-							Sounds = {},
-							Keys = {},
-						}
-					end
-
-					target_node = cur_node.Keys[char]
-				end
-
-				if target_node ~= cur_node then
-					if not existing_node_sounds[target_node] then
-						existing_node_sounds[target_node] = {}
-					end
-
-					if not existing_node_sounds[target_node][sound_key] then
-						existing_node_sounds[target_node][sound_key] = true
-						table.insert(target_node.Sounds, sound_key)
-					end
-
-					table.remove(cur_node.Sounds, sound_key_index)
-				end
-			end
-
-			root_node.__depth = depth + 1
 		end
 
 		update_loading_state()
 	end
 end
 
+local DYN_LOOKUP_VERSION = "2" -- bump to invalidate cached dynamic lookups when the structure changes
+
 local function compute_dynamic_lookup_hash()
-	return util.SHA1(table.concat(table.GetKeys(data.Repositories), ";"))
+	return util.SHA1(table.concat(table.GetKeys(data.Repositories), ";") .. ";v" .. DYN_LOOKUP_VERSION)
 end
 
 local function merge_repos(rebuild_dynamic_lookup)
@@ -376,11 +406,16 @@ local function merge_repos(rebuild_dynamic_lookup)
 			end
 		end
 
+		local max_key_length = 0
 		local existing_node_sounds = {}
 		for repo_name, repo in pairs(data.Repositories) do
 			for sound_key, sound_list in pairs(repo.List) do
 				if not lookup.List[sound_key] then
 					lookup.List[sound_key] = {}
+				end
+
+				if #sound_key > max_key_length then
+					max_key_length = #sound_key
 				end
 
 				local urls = {}
@@ -410,6 +445,7 @@ local function merge_repos(rebuild_dynamic_lookup)
 			cookie.Set("chatsounds_dyn_lookup", compute_dynamic_lookup_hash())
 		end
 
+		lookup.MaxKeyLength = max_key_length -- used by the parser to bail out of matching chunks that cannot be sound keys
 		data.Lookup = lookup
 	end)
 end

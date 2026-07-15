@@ -52,12 +52,18 @@ local CS_RUNNER_INTERVAL = CreateConVar(
 	10, 999999
 )
 
+-- Yield is called in very hot loops, querying the convar every call is too expensive
+local runner_interval = CS_RUNNER_INTERVAL:GetInt()
+cvars.AddChangeCallback("chatsounds_runner_interval", function()
+	runner_interval = CS_RUNNER_INTERVAL:GetInt()
+end, "chatsounds.Runners")
+
 local iter = 0
 function runners.Yield(max_iters)
 	if is_sync then return end
 	if not coroutine.running() then return end
 
-	if iter >= (max_iters or CS_RUNNER_INTERVAL:GetInt()) then
+	if iter >= (max_iters or runner_interval) then
 		coroutine.yield()
 		iter = 0
 	else
