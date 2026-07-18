@@ -415,19 +415,33 @@ if CLIENT then
 				table.insert(download_tasks, download_task)
 
 				if not file.Exists(_sound.Path, "DATA") then
-					chatsounds.DebugLog(("Downloading %s"):format(_sound.Url))
-					chatsounds.Http.Get(_sound.Url, true):next(function(res)
-						if res.Status ~= 200 then
-							download_task:reject(("Failed to download %s: %d"):format(_sound.Url, res.Status))
+					-- try each content provider in order, falling back on any non-200 or failure
+					local urls = chatsounds.Data.GetSoundUrls(_sound)
+					local function try_download(idx)
+						if idx > #urls then
+							download_task:reject(("Failed to download %s: all content providers failed"):format(_sound.Url))
 							return
 						end
 
-						file.Write(_sound.Path, res.Body)
-						chatsounds.DebugLog(("Downloaded %s"):format(_sound.Url))
-						streams[i] = prepare_stream(_sound, download_task)
-					end, function(err)
-						download_task:reject(("Failed to download %s: %s"):format(_sound.Url, err))
-					end)
+						local url = urls[idx]
+						chatsounds.DebugLog(("Downloading %s"):format(url))
+						chatsounds.Http.Get(url, true):next(function(res)
+							if res.Status ~= 200 then
+								chatsounds.DebugLog(("Failed to download %s: %d, trying next provider"):format(url, res.Status))
+								try_download(idx + 1)
+								return
+							end
+
+							file.Write(_sound.Path, res.Body)
+							chatsounds.DebugLog(("Downloaded %s"):format(url))
+							streams[i] = prepare_stream(_sound, download_task)
+						end, function(err)
+							chatsounds.DebugLog(("Failed to download %s: %s, trying next provider"):format(url, err))
+							try_download(idx + 1)
+						end)
+					end
+
+					try_download(1)
 				else
 					streams[i] = prepare_stream(_sound, download_task)
 				end
