@@ -8,12 +8,45 @@ data.Lookup = data.Lookup or {
 	Dynamic = {},
 }
 
-local function BUILD_CONTENT_URL(repo, branch, path)
-	-- just github
-	return ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, path)
+-- Ordered list of content providers, tried in this order. No single free GitHub CDN is
+-- reliable, so we fall back to the next one on any non-200 response or failure (see
+-- data.GetSoundUrls / handle_rate_limit and the download loop in player.lua).
+-- raw.githubusercontent.com is LAST because it is the origin that actually rate-limits
+-- (per-IP 429s) — we exhaust the caching CDNs first and only hit the origin as a last
+-- resort. Reordering this list is safe: the on-disk cache key is derived from the
+-- canonical URL below, NOT from this order.
+data.ContentProviders = data.ContentProviders or {
+	function(repo, branch, path) return ("https://cdn.jsdelivr.net/gh/%s@%s/%s"):format(repo, branch, path) end,
+	function(repo, branch, path) return ("https://cdn.statically.io/gh/%s@%s/%s"):format(repo, branch, path) end,
+	function(repo, branch, path) return ("https://raw.githack.com/%s/%s/%s"):format(repo, branch, path) end,
+	function(repo, branch, path) return ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, path) end,
+}
 
-	-- jsdeliver
-	--return ("https://cdn.jsdelivr.net/gh/%s@%s/%s"):format(repo, branch, path)
+-- Stable canonical URL for a piece of content, independent of provider order. Used ONLY
+-- to derive the on-disk cache key (Url/Path) so changing ContentProviders never
+-- invalidates already-downloaded files.
+local function BUILD_CONTENT_URL(repo, branch, path)
+	return ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, path)
+end
+
+-- builds every provider URL for a given (repo, branch, path), used for fallback
+local function build_content_urls(repo, branch, path)
+	local urls = {}
+	for _, provider in ipairs(data.ContentProviders) do
+		urls[#urls + 1] = provider(repo, branch, path)
+	end
+
+	return urls
+end
+
+-- rebuilds the ordered provider URLs for a sound entry compiled by BuildFrom*
+function data.GetSoundUrls(sound_data)
+	-- legacy/special entries without canonical parts can only use their baked-in Url
+	if not (sound_data.Repo and sound_data.Branch and sound_data.ContentPath) then
+		return { sound_data.Url }
+	end
+
+	return build_content_urls(sound_data.Repo, sound_data.Branch, sound_data.ContentPath)
 end
 
 function data.CacheRepository(repo, branch, path)
@@ -70,8 +103,47 @@ local function handle_rate_limit(http_res, base_task, task_fn, ...)
 	return false
 end
 
+-- fetches the first provider URL that returns HTTP 200, falling back to the next one on
+-- any non-200 status or request failure. Resolves with the 200 response; if none succeed,
+-- resolves with the LAST response (so handle_rate_limit can still honor Retry-After) or
+-- rejects if every request errored outright.
+local function get_with_fallback(urls, should_encode)
+	local t = chatsounds.Tasks.new()
+
+	local function try(idx, last_res)
+		if idx > #urls then
+			if last_res then
+				t:resolve(last_res)
+			else
+				t:reject("All content providers failed")
+			end
+
+			return
+		end
+
+		chatsounds.Http.Get(urls[idx], should_encode):next(function(res)
+			if res.Status == 200 then
+				t:resolve(res)
+			else
+				chatsounds.DebugLog(("Content provider returned %d for %s, trying next"):format(res.Status, urls[idx]))
+				try(idx + 1, res)
+			end
+		end, function(err)
+			chatsounds.DebugLog(("Content provider failed (%s) for %s, trying next"):format(tostring(err), urls[idx]))
+			try(idx + 1, last_res)
+		end)
+	end
+
+	try(1, nil)
+
+	return t
+end
+
+-- bump to invalidate cached repository lists when the stored sound_data schema changes
+local LIST_SCHEMA_VERSION = "2"
+
 local function check_cache_validity(body, repo, path, branch)
-	local hash = util.SHA1(body)
+	local hash = util.SHA1(body .. ";v" .. LIST_SCHEMA_VERSION)
 	local cache_path = ("chatsounds/repositories/%s.json"):format(util.SHA1(repo .. branch .. path))
 	if file.Exists(cache_path, "DATA") then
 		chatsounds.Log(("Found cached repository for %s/%s/%s, validating content..."):format(repo, branch, path))
@@ -88,11 +160,16 @@ end
 function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 	branch = branch or "master"
 
-	local msg_pack_url = BUILD_CONTENT_URL(repo, branch, ("%s/list.msgpack"):format(base_path))
+	local msg_pack_urls = build_content_urls(repo, branch, ("%s/list.msgpack"):format(base_path))
 	local t = chatsounds.Tasks.new()
-	chatsounds.Http.Get(msg_pack_url):next(function(res)
+	get_with_fallback(msg_pack_urls, false):next(function(res)
 		local rate_limited = handle_rate_limit(res, t, data.BuildFromGitHubMsgPack, repo, branch, base_path, force_recompile)
 		if rate_limited then return t end
+
+		if res.Status ~= 200 then
+			t:reject(("Failed to download list.msgpack for %s/%s/%s: %d"):format(repo, branch, base_path, res.Status))
+			return t
+		end
 
 		local is_cache_valid, hash = check_cache_validity(res.Body, repo, base_path, branch)
 		if is_cache_valid and not force_recompile then
@@ -137,12 +214,16 @@ function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 						data.Repositories[repo_key].List[sound_key] = {}
 					end
 
-					local url = BUILD_CONTENT_URL(repo, branch, ("%s/%s"):format(base_path, path))
+					local content_path = ("%s/%s"):format(base_path, path)
+					local url = BUILD_CONTENT_URL(repo, branch, content_path)
 					local sound_path = ("chatsounds/cache/%s/%s.ogg"):format(realm, util.SHA1(url))
 					local sound_data = {
 						Url = url,
 						Realm = realm,
 						Path = sound_path,
+						Repo = repo,
+						Branch = branch,
+						ContentPath = content_path,
 					}
 
 					table.insert(data.Repositories[repo_key].List[sound_key], sound_data)
@@ -233,6 +314,9 @@ function data.BuildFromGithub(repo, branch, base_path, force_recompile)
 							Url = url,
 							Realm = realm,
 							Path = sound_path,
+							Repo = repo,
+							Branch = branch,
+							ContentPath = file_data.path,
 						}
 
 						table.insert(data.Repositories[repo_key].List[sound_key], sound_data)
