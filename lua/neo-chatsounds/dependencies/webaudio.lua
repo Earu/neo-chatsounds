@@ -275,6 +275,133 @@ function webaudio.Initialize()
 
 		setTimeout(on_audio_buffers_broadcast, 50);
 
+		/* per-sound loudness normalization, a simplified EBU R128 / BS.1770 gated loudness.
+		   sounds come from dozens of unrelated repos at wildly different mastering levels, so we
+		   measure each decoded buffer once and apply a corrective gain underneath the modifiers. */
+		const NORMALIZE_TARGET_RMS = 0.125; /* -18 dBFS gated RMS reference */
+		const NORMALIZE_MIN_GAIN = 0.25; /* -12 dB, floor for very loud sounds */
+		const NORMALIZE_MAX_GAIN = 4.0; /* +12 dB, ceiling for very quiet sounds */
+		const NORMALIZE_BLOCK_MS = 100; /* gating block size */
+		const NORMALIZE_ABS_GATE = 1e-6; /* -60 dBFS mean-square, skips noise floor / room tone */
+		const NORMALIZE_REL_GATE = 0.1; /* -10 dB relative to the ungated mean */
+		const NORMALIZE_MAX_SAMPLES = 500000; /* analysis budget, longer buffers get strided */
+
+		/* url -> {loudness, peak}, deliberately never evicted (two floats per sound), because
+		   buffer_cache is dropped on DestroyStream and spammed sounds get decoded over and over */
+		const normalize_cache = new Object();
+
+		/* onaudioprocess runs on the main thread, so this must not block long enough to glitch
+		   audio that is already playing, hence the sample budget */
+		function analyze_buffer(buffer) {
+			const left = buffer.getChannelData(0);
+			const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : null;
+			const length = buffer.length;
+			const stride = Math.max(1, Math.floor(length / NORMALIZE_MAX_SAMPLES));
+			const block_size = Math.max(1, Math.round(buffer.sampleRate * NORMALIZE_BLOCK_MS / 1000));
+
+			const blocks = [];
+			let peak = 0;
+			let total_square = 0;
+			let total_count = 0;
+
+			for (let block_start = 0; block_start < length; block_start += block_size) {
+				const block_end = Math.min(block_start + block_size, length);
+				let square = 0;
+				let count = 0;
+
+				for (let i = block_start; i < block_end; i += stride) {
+					const l = left[i];
+					square += l * l;
+					count++;
+
+					const abs_l = Math.abs(l);
+					if (abs_l > peak) {
+						peak = abs_l;
+					}
+
+					if (right !== null) {
+						const r = right[i];
+						square += r * r;
+						count++;
+
+						const abs_r = Math.abs(r);
+						if (abs_r > peak) {
+							peak = abs_r;
+						}
+					}
+				}
+
+				if (count > 0) {
+					blocks.push(square / count);
+					total_square += square;
+					total_count += count;
+				}
+			}
+
+			if (total_count === 0) {
+				return { loudness: NORMALIZE_TARGET_RMS, peak: 1 };
+			}
+
+			/* absolute gate, then relative gate against the mean of what survived it */
+			let gated_sum = 0;
+			let gated_count = 0;
+			for (let i = 0; i < blocks.length; i++) {
+				if (blocks[i] >= NORMALIZE_ABS_GATE) {
+					gated_sum += blocks[i];
+					gated_count++;
+				}
+			}
+
+			if (gated_count > 0) {
+				const relative_threshold = gated_sum / gated_count * NORMALIZE_REL_GATE;
+				let sum = 0;
+				let count = 0;
+				for (let i = 0; i < blocks.length; i++) {
+					if (blocks[i] >= NORMALIZE_ABS_GATE && blocks[i] >= relative_threshold) {
+						sum += blocks[i];
+						count++;
+					}
+				}
+
+				if (count > 0) {
+					return { loudness: Math.sqrt(sum / count), peak: peak };
+				}
+			}
+
+			/* nothing survived the gates (very short or very quiet clip), fall back to plain rms */
+			const rms = Math.sqrt(total_square / total_count);
+			return { loudness: rms > 0 ? rms : NORMALIZE_TARGET_RMS, peak: peak };
+		}
+
+		function compute_normalize_gain(analysis) {
+			let gain = NORMALIZE_TARGET_RMS / analysis.loudness;
+			gain = Math.min(Math.max(gain, NORMALIZE_MIN_GAIN), NORMALIZE_MAX_GAIN);
+
+			/* peak-safe, a boosted sound can never clip against the mixer's clamp */
+			if (analysis.peak > 0) {
+				gain = Math.min(gain, 1.0 / analysis.peak);
+			}
+
+			if (!isFinite(gain) || gain <= 0) {
+				gain = 1;
+			}
+
+			return gain;
+		}
+
+		function get_normalize_gain(url, buffer) {
+			let analysis = normalize_cache[url];
+			if (!analysis) {
+				analysis = analyze_buffer(buffer);
+				normalize_cache[url] = analysis;
+			}
+
+			const gain = compute_normalize_gain(analysis);
+			dprint("normalized " + url + " loudness " + analysis.loudness + " peak " + analysis.peak + " gain " + gain);
+
+			return gain;
+		}
+
 		function open() {
 			if (audio) {
 				audio.destination.disconnect();
@@ -342,6 +469,10 @@ function webaudio.Initialize()
 					var sml = 0;
 					var smr = 0;
 
+					/* normalization is folded into vol_both here so it sits underneath every
+					   modifier, and costs nothing per sample */
+					var vol_both = stream.vol_both * stream.normalize_gain;
+
 					var stream_audio_buffer = [];
 					for (var j = 0; j < event.outputBuffer.length; ++j) {
 						if (
@@ -379,20 +510,20 @@ function webaudio.Initialize()
 							// filters
 							if (stream.filter_type == 0) {
 								// None
-								left = buffer_left[index] * stream.vol_both;
-								right = buffer_right[index] * stream.vol_both;
+								left = buffer_left[index] * vol_both;
+								right = buffer_right[index] * vol_both;
 							} else {
 								sml = sml + (buffer_left[index] - sml) * stream.filter_fraction;
 								smr = smr + (buffer_right[index] - smr) * stream.filter_fraction;
 
 								if (stream.filter_type == 1) {
 									// Low pass
-									left = sml * stream.vol_both;
-									right = smr * stream.vol_both;
+									left = sml * vol_both;
+									right = smr * vol_both;
 								} else if (stream.filter_type == 2) {
 									// High pass
-									left = (buffer_left[index] - sml) * stream.vol_both;
-									right = (buffer_right[index] - smr) * stream.vol_both;
+									left = (buffer_left[index] - sml) * vol_both;
+									right = (buffer_right[index] - smr) * vol_both;
 								}
 							}
 
@@ -541,6 +672,7 @@ function webaudio.Initialize()
 					stream.speed = 1; // 1 = normal pitch
 					stream.max_loop = 1; // -1 = inf
 					stream.vol_both = 1;
+					stream.normalize_gain = get_normalize_gain(url, buffer);
 					stream.vol_left = 1;
 					stream.vol_right = 1;
 					stream.paused = true;
