@@ -472,6 +472,7 @@ if CLIENT then
 							stream:Set3D(true)
 							stream.Duration = stream:GetLength() - SOUND_WHITENOISE_DURATION_APROMIXATION
 							stream.Overlap = true
+							stream.Lifetime = nil -- how long to keep the stream around when it outlives its duration (see the loop modifier)
 
 							local function remove_stream()
 								if stream:IsValid() then
@@ -491,7 +492,7 @@ if CLIENT then
 							end
 
 							timer.Simple(stream.Duration, function()
-								if not stream.Overlap then
+								if not stream.Overlap and not stream.Lifetime then
 									remove_stream()
 								end
 
@@ -499,8 +500,11 @@ if CLIENT then
 								hook.Run("ChatsoundsSoundFinish", ply, _sound, sound_data)
 							end)
 
-							if stream.Overlap then
-								timer.Simple(stream:GetLength() + 1, remove_stream)
+							if stream.Overlap or stream.Lifetime then
+								-- a stream can be made to last longer than a single playback (looping),
+								-- only remove it once it is actually done playing
+								local lifetime = math.max(stream.Lifetime or stream.Duration, stream:GetLength())
+								timer.Simple(lifetime + 1, remove_stream)
 							end
 
 							if chatsounds.Blacklist.IsSoundBlocked(sound_data.Key, _sound) then
