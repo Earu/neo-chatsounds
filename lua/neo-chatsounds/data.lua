@@ -8,9 +8,10 @@ data.Lookup = data.Lookup or {
 	Dynamic = {},
 }
 
--- Ordered list of content providers, tried in this order. No single free GitHub CDN is
--- reliable, so we fall back to the next one on any non-200 response or failure (see
--- data.GetSoundUrls / handle_rate_limit and the download loop in player.lua).
+-- Ordered list of content providers for sound files, tried in this order. No single free
+-- GitHub CDN is reliable, so we fall back to the next one on any non-200 response or
+-- failure (see data.GetSoundUrls and the download loop in player.lua). Sound files are
+-- immutable, which is why CDN caching is fine for them but not for list.msgpack.
 -- raw.githubusercontent.com is LAST because it is the origin that actually rate-limits
 -- (per-IP 429s) — we exhaust the caching CDNs first and only hit the origin as a last
 -- resort. Reordering this list is safe: the on-disk cache key is derived from the
@@ -18,7 +19,6 @@ data.Lookup = data.Lookup or {
 data.ContentProviders = data.ContentProviders or {
 	function(repo, branch, path) return ("https://cdn.jsdelivr.net/gh/%s@%s/%s"):format(repo, branch, path) end,
 	function(repo, branch, path) return ("https://cdn.statically.io/gh/%s@%s/%s"):format(repo, branch, path) end,
-	function(repo, branch, path) return ("https://raw.githack.com/%s/%s/%s"):format(repo, branch, path) end,
 	function(repo, branch, path) return ("https://raw.githubusercontent.com/%s/%s/%s"):format(repo, branch, path) end,
 }
 
@@ -103,42 +103,6 @@ local function handle_rate_limit(http_res, base_task, task_fn, ...)
 	return false
 end
 
--- fetches the first provider URL that returns HTTP 200, falling back to the next one on
--- any non-200 status or request failure. Resolves with the 200 response; if none succeed,
--- resolves with the LAST response (so handle_rate_limit can still honor Retry-After) or
--- rejects if every request errored outright.
-local function get_with_fallback(urls, should_encode)
-	local t = chatsounds.Tasks.new()
-
-	local function try(idx, last_res)
-		if idx > #urls then
-			if last_res then
-				t:resolve(last_res)
-			else
-				t:reject("All content providers failed")
-			end
-
-			return
-		end
-
-		chatsounds.Http.Get(urls[idx], should_encode):next(function(res)
-			if res.Status == 200 then
-				t:resolve(res)
-			else
-				chatsounds.DebugLog(("Content provider returned %d for %s, trying next"):format(res.Status, urls[idx]))
-				try(idx + 1, res)
-			end
-		end, function(err)
-			chatsounds.DebugLog(("Content provider failed (%s) for %s, trying next"):format(tostring(err), urls[idx]))
-			try(idx + 1, last_res)
-		end)
-	end
-
-	try(1, nil)
-
-	return t
-end
-
 -- bump to invalidate cached repository lists when the stored sound_data schema changes
 local LIST_SCHEMA_VERSION = "2"
 
@@ -160,9 +124,11 @@ end
 function data.BuildFromGitHubMsgPack(repo, branch, base_path, force_recompile)
 	branch = branch or "master"
 
-	local msg_pack_urls = build_content_urls(repo, branch, ("%s/list.msgpack"):format(base_path))
+	-- lists change over time, so they always come from the origin: the CDNs cache
+	-- aggressively and would hand us a stale list.msgpack for hours or days
+	local msg_pack_url = BUILD_CONTENT_URL(repo, branch, ("%s/list.msgpack"):format(base_path))
 	local t = chatsounds.Tasks.new()
-	get_with_fallback(msg_pack_urls, false):next(function(res)
+	chatsounds.Http.Get(msg_pack_url, false):next(function(res)
 		local rate_limited = handle_rate_limit(res, t, data.BuildFromGitHubMsgPack, repo, branch, base_path, force_recompile)
 		if rate_limited then return t end
 
