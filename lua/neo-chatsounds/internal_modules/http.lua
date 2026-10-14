@@ -16,7 +16,7 @@ local MAX_CONCURRENT = 4
 local in_flight = 0
 local queue = {}
 
-local function dispatch(url, t)
+local function dispatch(url, t, timeout)
 	in_flight = in_flight + 1
 
 	local finished = false
@@ -28,13 +28,14 @@ local function dispatch(url, t)
 
 		local nxt = table.remove(queue, 1)
 		if nxt then
-			dispatch(nxt.Url, nxt.Task)
+			dispatch(nxt.Url, nxt.Task, nxt.Timeout)
 		end
 	end
 
 	local success = HTTP({
 		method = "GET",
 		url = url,
+		timeout = timeout,
 		failed = function(err)
 			done()
 			t:reject(err)
@@ -55,7 +56,7 @@ local function dispatch(url, t)
 	end
 end
 
-function _http.Get(url, should_encode)
+function _http.Get(url, should_encode, timeout)
 	if should_encode then
 		url = encode_sound_path(url):gsub(" ", "%%20")
 	end
@@ -63,9 +64,9 @@ function _http.Get(url, should_encode)
 	local t = chatsounds.Tasks.new()
 
 	if in_flight >= MAX_CONCURRENT then
-		table.insert(queue, { Url = url, Task = t })
+		table.insert(queue, { Url = url, Task = t, Timeout = timeout })
 	else
-		dispatch(url, t)
+		dispatch(url, t, timeout)
 	end
 
 	return t

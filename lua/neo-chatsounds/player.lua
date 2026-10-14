@@ -295,6 +295,7 @@ if CLIENT then
 	end
 
 	local WEBAUDIO_TIMEOUT = 10
+	local PROVIDER_TIMEOUT = 2
 	local function prepare_stream(snd, task)
 		local stream = chatsounds.WebAudio.CreateStream("data/" .. snd.Path)
 		local hook_name = ("chatsounds_stream_loading_%s"):format(stream:GetId())
@@ -419,7 +420,7 @@ if CLIENT then
 
 						local url = urls[idx]
 						chatsounds.DebugLog(("Downloading %s"):format(url))
-						chatsounds.Http.Get(url, true):next(function(res)
+						chatsounds.Http.Get(url, true, PROVIDER_TIMEOUT):next(function(res)
 							if res.Status ~= 200 then
 								chatsounds.DebugLog(("Failed to download %s: %d, trying next provider"):format(url, res.Status))
 								try_download(idx + 1)
