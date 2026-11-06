@@ -502,7 +502,7 @@ end
 
 local function prepare_default_config()
 	local default_config = {}
-	local valve_folders = { "csgo", "css", "ep1", "ep2", "hl1", "hl2", "l4d", "l4d2", "portal", "tf2" }
+	local valve_folders = { "csgo", "css", "ep1", "ep2", "hl1", "hl2", "l4d", "l4d2", "portal", "portal2", "tf2" }
 	for _, valve_folder in ipairs(valve_folders) do
 		table.insert(default_config, {
 			Repo = "PAC3-Server/chatsounds-valve-games",
